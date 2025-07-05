@@ -1,0 +1,4 @@
+id,name,risk_id,status,owner,risk_text,control_text
+1,User Access Review,R1,Active,Alice,"Risk of unauthorized access to sensitive systems due to stale or overly permissive user accounts.","Quarterly, the system owner reviews all user accounts with privileged access. Any accounts that are no longer required are disabled within 24 hours of identification."
+2,Password Policy,R1,Active,Alice,"Risk of account compromise through weak or easily guessable passwords.","All user passwords must be a minimum of 12 characters and include uppercase, lowercase, numbers, and special characters. Passwords must be changed every 90 days."
+3,Data Encryption in Transit,R2,Implemented,Bob,"Risk of data interception and theft as it moves across the network.","All internal and external network traffic is encrypted using TLS 1.2 or higher."

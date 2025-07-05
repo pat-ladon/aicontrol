@@ -1,0 +1,55 @@
+{% if control %}
+    <div class="p-4">
+        <h2 class="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-100">Control Details</h2>
+        <form hx-post="/controls/{{ control.id }}/update" hx-target="#right-sidebar" hx-swap="innerHTML">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Control Name</label>
+                <input type="text" name="name" value="{{ control.name }}" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Risk ID</label>
+                <input type="text" name="risk_id" value="{{ control.risk_id }}" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Status</label>
+                <select name="status" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
+                    <option value="Active" {% if control.status == "Active" %}selected{% endif %}>Active</option>
+                    <option value="Pending" {% if control.status == "Pending" %}selected{% endif %}>Pending</option>
+                    <option value="Inactive" {% if control.status == "Inactive" %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Owner</label>
+                <input type="text" name="owner" value="{{ control.owner }}" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
+            </div>
+            <button type="submit" class="bg-primary-600 dark:bg-primary-700 text-neutral-50 px-4 py-2 rounded hover:bg-primary-700 dark:hover:bg-primary-800">Save</button>
+        </form>
+    </div>
+{% else %}
+    <div class="p-4">
+        <h2 class="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-100">Add New Control</h2>
+        <form hx-post="/controls" hx-target="#main-content tbody" hx-swap="beforeend">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Control Name</label>
+                <input type="text" name="name" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100" required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Risk ID</label>
+                <input type="text" name="risk_id" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100" required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Status</label>
+                <select name="status" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
+                    <option value="Active">Active</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Owner</label>
+                <input type="text" name="owner" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100" required>
+            </div>
+            <button type="submit" class="bg-primary-600 dark:bg-primary-700 text-neutral-50 px-4 py-2 rounded hover:bg-primary-700 dark:hover:bg-primary-800">Add Control</button>
+        </form>
+    </div>
+{% endif %}

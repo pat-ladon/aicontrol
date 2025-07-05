@@ -2,6 +2,11 @@
 __pycache__/
 *.py[codz]
 *$py.class
+.DS_Store
+
+package-lock.json
+package.json
+node_modules/
 
 # C extensions
 *.so

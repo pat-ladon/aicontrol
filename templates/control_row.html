@@ -1,0 +1,19 @@
+<tr
+  class="hover:bg-secondary-100 dark:hover:bg-secondary-800 cursor-pointer text-neutral-900 dark:text-neutral-100"
+  hx-get="/controls/{{ control.id }}"
+  hx-target="#right-sidebar"
+  hx-swap="innerHTML"
+>
+  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
+    {{ control.name }}
+  </td>
+  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
+    {{ control.risk_id }}
+  </td>
+  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
+    {{ control.status }}
+  </td>
+  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
+    {{ control.owner }}
+  </td>
+</tr>

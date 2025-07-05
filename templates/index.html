@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device, initial-scale=1.0" />
+    <title>Risk Control App</title>
+    <link href="/static/styles.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/theme.js"></script>
+  </head>
+  <body
+    class="bg-secondary-50 dark:bg-red-900 font-sans text-neutral-900 dark:text-neutral-100"
+  >
+    <div class="flex flex-col h-screen">
+      <!-- Top Bar -->
+      <header class="bg-primary-500 dark:bg-primary-700 text-neutral-50 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+          <h1 class="text-2xl font-bold">Risk Control App</h1>
+          <div class="space-x-4">
+            <button
+              class="bg-primary-600 dark:bg-primary-800 text-neutral-50 px-4 py-2 rounded"
+              hx-get="/controls/new"
+              hx-target="#right-sidebar"
+              hx-swap="innerHTML"
+            >
+              Add New Control
+            </button>
+            <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+          </div>
+        </div>
+      </header>
+      <!-- Main Grid -->
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar -->
+        <aside
+          class="w-1/4 bg-secondary-100 dark:bg-secondary-800 p-4 border-r border-secondary-300 dark:border-secondary-600"
+        >
+          <h2 class="text-lg font-semibold mb-4">Filters</h2>
+          <input
+            type="text"
+            placeholder="Search controls..."
+            class="w-full p-2 mb-4 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100"
+            hx-post="/search"
+            hx-target="#main-content"
+            hx-trigger="keyup changed delay:500ms"
+          />
+          <div>
+            <h3 class="font-medium">Risk Categories</h3>
+            <ul>
+              <li>
+                <a
+                  href="#"
+                  class="text-accent-500 hover:text-accent-600 dark:text-accent-400 dark:hover:text-accent-500"
+                  >Operational</a
+                >
+              </li>
+              <li>
+                <a
+                  href="#"
+                  class="text-accent-500 hover:text-accent-600 dark:text-accent-400 dark:hover:text-accent-500"
+                  >Financial</a
+                >
+              </li>
+            </ul>
+          </div>
+        </aside>
+        <!-- Main Content -->
+        <main id="main-content" class="w-1/2 p-4 overflow-y-auto">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr
+                class="bg-secondary-200 dark:bg-secondary-700 text-neutral-900 dark:text-neutral-100"
+              >
+                <th class="p-2 text-left">Control Name</th>
+                <th class="p-2 text-left">Risk ID</th>
+                <th class="p-2 text-left">Status</th>
+                <th class="p-2 text-left">Owner</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for control in controls %} {% include 'control_row.html' %} {%
+              endfor %}
+            </tbody>
+          </table>
+        </main>
+        <!-- Right Sidebar -->
+        <aside
+          id="right-sidebar"
+          class="w-1/4 bg-secondary-100 dark:bg-secondary-800 p-4 border-l border-secondary-300 dark:border-secondary-600"
+        >
+          <h2 class="text-lg font-semibold mb-4">Control Details</h2>
+          <p>Select a control to view details.</p>
+        </aside>
+      </div>
+    </div>
+  </body>
+</html>
