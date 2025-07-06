@@ -1,19 +1,16 @@
+<!-- templates/control_row.html -->
 <tr
-  class="hover:bg-secondary-100 dark:hover:bg-secondary-800 cursor-pointer text-neutral-900 dark:text-neutral-100"
+  class="border-b border-secondary-200 dark:border-secondary-700 hover:bg-secondary-300 dark:hover:bg-secondary-900 cursor-pointer"
   hx-get="/controls/{{ control.id }}"
-  hx-target="#right-sidebar"
+  hx-target="#main-content"
   hx-swap="innerHTML"
 >
-  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
-    {{ control.name }}
-  </td>
-  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
-    {{ control.risk_id }}
-  </td>
-  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
-    {{ control.status }}
-  </td>
-  <td class="p-2 border-b border-secondary-300 dark:border-secondary-600">
-    {{ control.owner }}
+  <td class="p-2">
+    <div class="font-medium text-sm text-neutral-900 dark:text-neutral-100">
+      {{ control.name }}
+    </div>
+    <div class="text-xs text-gray-500 dark:text-gray-400">
+      Owner: {{ control.owner }} | Risk: {{ control.risk_id }}
+    </div>
   </td>
 </tr>

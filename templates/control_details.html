@@ -1,55 +1,59 @@
-{% if control %}
-    <div class="p-4">
-        <h2 class="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-100">Control Details</h2>
-        <form hx-post="/controls/{{ control.id }}/update" hx-target="#right-sidebar" hx-swap="innerHTML">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Control Name</label>
-                <input type="text" name="name" value="{{ control.name }}" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Risk ID</label>
-                <input type="text" name="risk_id" value="{{ control.risk_id }}" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Status</label>
-                <select name="status" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
-                    <option value="Active" {% if control.status == "Active" %}selected{% endif %}>Active</option>
-                    <option value="Pending" {% if control.status == "Pending" %}selected{% endif %}>Pending</option>
-                    <option value="Inactive" {% if control.status == "Inactive" %}selected{% endif %}>Inactive</option>
-                </select>
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Owner</label>
-                <input type="text" name="owner" value="{{ control.owner }}" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
-            </div>
-            <button type="submit" class="bg-primary-600 dark:bg-primary-700 text-neutral-50 px-4 py-2 rounded hover:bg-primary-700 dark:hover:bg-primary-800">Save</button>
-        </form>
+<div class="p-4 bg-secondary-100 dark:bg-secondary-850 shadow h-full">
+  <h2 class="text-xl font-bold mb-2 text-neutral-900 dark:text-neutral-100">
+    {{ control.name }}
+  </h2>
+  <div class="space-y-4">
+    <div>
+      <h3 class="font-semibold text-sm text-gray-600 dark:text-gray-400">
+        Risk Description
+      </h3>
+      <p class="text-neutral-900 dark:text-neutral-100">
+        {{ control.risk_text }}
+      </p>
     </div>
-{% else %}
-    <div class="p-4">
-        <h2 class="text-lg font-semibold mb-4 text-neutral-900 dark:text-neutral-100">Add New Control</h2>
-        <form hx-post="/controls" hx-target="#main-content tbody" hx-swap="beforeend">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Control Name</label>
-                <input type="text" name="name" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100" required>
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Risk ID</label>
-                <input type="text" name="risk_id" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100" required>
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Status</label>
-                <select name="status" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100">
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
-            </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-200">Owner</label>
-                <input type="text" name="owner" class="w-full p-2 border border-secondary-300 dark:border-secondary-600 rounded bg-secondary-50 dark:bg-secondary-900 text-neutral-900 dark:text-neutral-100" required>
-            </div>
-            <button type="submit" class="bg-primary-600 dark:bg-primary-700 text-neutral-50 px-4 py-2 rounded hover:bg-primary-700 dark:hover:bg-primary-800">Add Control</button>
-        </form>
+    <div>
+      <h3 class="font-semibold text-sm text-gray-600 dark:text-gray-400">
+        Control Description
+      </h3>
+      <p class="text-neutral-900 dark:text-neutral-100">
+        {{ control.control_text }}
+      </p>
     </div>
-{% endif %}
+    <hr class="dark:border-secondary-700" />
+    <div class="flex space-x-2">
+      <!-- CHANGED: Removed rounded -->
+      <button
+        class="bg-primary-600 text-white px-4 py-2 text-sm font-medium hover:bg-opacity-90"
+        hx-post="/controls/{{ control.id }}/assess"
+        hx-target="#assessment-output"
+        hx-swap="innerHTML"
+        hx-indicator="#assessment-spinner"
+      >
+        Generate Assessment
+      </button>
+      <!-- CHANGED: Removed rounded -->
+      <button
+        class="bg-gray-500 text-white px-4 py-2 text-sm font-medium hover:bg-gray-600"
+        hx-post="/controls/{{ control.id }}/suggest"
+        hx-target="#suggestions-output"
+        hx-swap="innerHTML"
+        hx-indicator="#suggestions-spinner"
+      >
+        Suggest Improvements
+      </button>
+    </div>
+    <div id="assessment-output">
+      <div id="assessment-spinner" class="htmx-indicator">
+        Loading Assessment...
+      </div>
+      {% if control.assessment_document %}{% include 'assessment.html' %}{%
+      endif %}
+    </div>
+    <div id="suggestions-output">
+      <div id="suggestions-spinner" class="htmx-indicator">
+        Loading Suggestions...
+      </div>
+      {% if control.suggestions %}{% include 'suggestions.html' %}{% endif %}
+    </div>
+  </div>
+</div>

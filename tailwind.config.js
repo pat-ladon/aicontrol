@@ -1,95 +1,56 @@
-/** @type {import('tailwindcss').Config} */
+// tailwind.config.js
+
 module.exports = {
-  content: ["./templates/**/*.{html,jinja}"],
-  darkMode: "selector", // Uses data-theme attribute
+  content: ["./templates/**/*.html", "./templates/partials/**/*.html"],
+  darkMode: "class",
+
   theme: {
-    extend: {
-      colors: {
-        primary: {
-          50: "#E6F0FA", // Light mode: Very light blue for backgrounds
-          100: "#BFDBFE",
-          200: "#93C5FD",
-          300: "#60A5FA",
-          400: "#3B82F6",
-          500: "#1E3A8A", // Light mode: Primary blue for headers/buttons
-          600: "#1E40AF",
-          700: "#1E3A8A", // Dark mode: Primary blue
-          800: "#1E3A8A",
-          900: "#1E3A8A",
-        },
-        secondary: {
-          50: "#F9FAFB", // Light mode: Light gray for backgrounds
-          100: "#F3F4F6",
-          200: "#E5E7EB",
-          300: "#D1D5DB",
-          400: "#9CA3AF",
-          500: "#6B7280",
-          600: "#4B5563",
-          700: "#374151", // Dark mode: Dark gray for backgrounds
-          800: "#1F2A44",
-          900: "#111827",
-        },
-        accent: {
-          50: "#ECFDF5",
-          100: "#D1FAE5",
-          200: "#A7F3D0",
-          300: "#6EE7B7",
-          400: "#34D399",
-          500: "#10B981", // Teal for highlights
-          600: "#059669",
-          700: "#047857",
-          800: "#065F46",
-          900: "#064E3B",
-        },
-        neutral: {
-          50: "#FAFAFA",
-          100: "#F5F5F5",
-          200: "#E5E5E5",
-          300: "#D4D4D4",
-          400: "#A3A3A3",
-          500: "#737373",
-          600: "#525252",
-          700: "#404040",
-          800: "#262626",
-          900: "#171717", // Light mode: Text, Dark mode: Background
-          950: "#0A0A0A",
-        },
+    // We define our entire color palette here, completely REPLACING the default.
+    // It is NOT inside the 'extend' block.
+    colors: {
+      // Add transparent and current for utility
+      transparent: "transparent",
+      current: "currentColor",
+      // Primary Action Colors
+      primary: {
+        500: "#0A2540", // Deep Navy
+        600: "#28A7A7", // Action Teal
       },
-      fontFamily: {
-        sans: [
-          "Inter",
-          "ui-sans-serif",
-          "system-ui",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "Segoe UI",
-          "Roboto",
-          "Helvetica Neue",
-          "Arial",
-          "sans-serif",
-        ],
+      // UI Shades Palette
+      secondary: {
+        50: "#F8F9FA", // Light Mode: Page BG
+        100: "#FFFFFF", // Light Mode: Card/Surface BG
+        200: "#E9ECEF", // Light Mode: Borders
+        300: "#F1F3F5", // Light Mode: Subtle Hover State
+        700: "#3A5983", // Dark Mode: Borders
+        800: "#0A2540", // Dark Mode: Page BG
+        850: "#1E3A5F", // Dark Mode: Card/Surface BG
+        900: "#2A4B7C", // Dark Mode: Hover State
       },
-      fontSize: {
-        xs: ["0.75rem", { lineHeight: "1rem" }],
-        sm: ["0.875rem", { lineHeight: "1.25rem" }],
-        base: ["1rem", { lineHeight: "1.5rem" }],
-        lg: ["1.125rem", { lineHeight: "1.75rem" }],
-        xl: ["1.25rem", { lineHeight: "1.75rem" }],
-        "2xl": ["1.5rem", { lineHeight: "2rem" }],
+      // Accent & Neutral Text Colors
+      accent: {
+        500: "#28A7A7",
+        600: "#1e7777",
       },
-      spacing: {
-        18: "4.5rem",
-        112: "28rem",
-        128: "32rem",
+      neutral: {
+        50: "#F8F9FA", // Text on Dark BG
+        100: "#F8F9FA", // Dark Mode Primary Text
+        900: "#0A2540", // Light Mode Primary Text
       },
-      borderRadius: {
-        xl: "1rem",
-        "2xl": "1.5rem",
-      },
-      boxShadow: {
-        soft: "0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)",
+      // Utility Colors
+      white: "#FFFFFF",
+      gray: {
+        400: "#9ca3af",
+        500: "#6b7280",
+        600: "#4b5563",
+        800: "#1f2937",
       },
     },
+    // The 'extend' block is now used for non-color extensions if needed.
+    extend: {
+      // You can extend fonts, spacing, etc. here later.
+    },
   },
-  plugins: [],
+
+  plugins: [require("@tailwindcss/typography")],
 };

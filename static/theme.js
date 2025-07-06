@@ -20,10 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Set the initial button text
   updateToggleButton();
-  console.log(
-    "Initial theme class applied:",
-    html.classList.contains("dark") ? "dark" : "light"
-  );
 
   // Toggle theme on click
   toggle.addEventListener("click", () => {
@@ -39,9 +35,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Update the button text
     updateToggleButton();
-    console.log(
-      "Switched to theme:",
-      html.classList.contains("dark") ? "dark" : "light"
-    );
   });
 });
