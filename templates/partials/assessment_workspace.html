@@ -1,0 +1,90 @@
+<!-- This single file now represents the entire workspace "component" -->
+<div
+  id="assessment-workspace-wrapper"
+  class="flex flex-col bg-secondary-100 dark:bg-secondary-850 border border-secondary-200 dark:border-secondary-700 shadow mt-4"
+>
+  <!-- 1. The Main Content Area -->
+  <div
+    id="assessment-workspace-content"
+    class="prose prose-sm dark:prose-invert max-w-none p-4 flex-grow"
+  >
+    {% if control.assessment_document %}
+    <!-- ACTIVE STATE: If assessment exists, display it and make it editable -->
+    {{ control.assessment_document | safe }}
+    <script>
+      // Initialize the localStorage state and make the div editable
+      (function () {
+        if (
+          window.grc &&
+          typeof window.grc.initializeWorkspace === "function"
+        ) {
+          window.grc.initializeWorkspace("{{ control.id }}");
+        }
+      })();
+    </script>
+    {% else %}
+    <!-- EMPTY STATE: If no assessment, show a placeholder -->
+    <div class="text-center p-6">
+      <h3 class="font-semibold text-lg text-neutral-900 dark:text-neutral-100">
+        No Assessment Generated
+      </h3>
+      <p class="text-gray-600 dark:text-gray-400 mt-2 mb-4">
+        This control has no baseline assessment. Generate one to begin.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- 2. The Action Bar -->
+  <div
+    class="flex items-center space-x-3 p-3 bg-secondary-200/50 dark:bg-secondary-900/50 border-t border-secondary-200 dark:border-secondary-700"
+  >
+    {% if not control.assessment_document %}
+    <!-- EMPTY STATE ACTION -->
+    <button
+      class="bg-primary-600 text-white font-bold py-2 px-4 hover:bg-opacity-90 flex-grow"
+      hx-post="/controls/{{ control.id }}/assess"
+      hx-target="#assessment-workspace-wrapper"
+      hx-swap="outerHTML"
+      hx-indicator="#generate-spinner"
+    >
+      Generate Baseline Assessment
+    </button>
+    <span id="generate-spinner" class="htmx-indicator text-sm">Working...</span>
+    {% else %}
+    <!-- ACTIVE STATE ACTIONS -->
+    <button
+      class="bg-blue-600 text-white px-4 py-2 font-medium"
+      hx-post="/controls/refine"
+      hx-target="#refinements-output"
+      hx-trigger="click"
+      hx-vals="js:{current_html: document.getElementById('assessment-workspace-content').innerHTML, control_id: '{{ control.id }}'}"
+      hx-indicator="#refine-spinner"
+    >
+      Refine
+    </button>
+    <button
+      class="bg-gray-600 text-white px-4 py-2 font-medium"
+      hx-post="/controls/check-quality"
+      hx-target="#quality-check-container"
+      hx-swap="innerHTML"
+      hx-vals="js:{assessment_html: document.getElementById('assessment-workspace-content').innerHTML}"
+      hx-indicator="#quality-spinner"
+    >
+      Check Quality
+    </button>
+    <div class="flex-grow"></div>
+    <!-- Spacer -->
+    <button
+      class="bg-red-700 text-white px-4 py-2 font-medium"
+      onclick="grc.resetWorkspace('{{ control.id }}')"
+    >
+      Reset
+    </button>
+
+    <!-- Spinners for active state -->
+    <span id="refine-spinner" class="htmx-indicator text-sm">Refining...</span>
+    <span id="quality-spinner" class="htmx-indicator text-sm">Checking...</span>
+    {% endif %}
+  </div>
+</div>

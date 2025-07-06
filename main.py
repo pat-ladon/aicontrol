@@ -7,7 +7,7 @@ import csv
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Request, Form, HTTPException, Response
+from fastapi import FastAPI, Request, Form, HTTPException, Response, BackgroundTasks
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -110,6 +110,26 @@ class Control(BaseModel):
     control_text: str
     suggestions: Optional[str] = None
     assessment_document: Optional[str] = None
+
+class RefineRequest(BaseModel):
+    control_id: str
+    current_html: str
+    
+class QualityCheckRequest(BaseModel):
+    assessment_html: str
+
+class TrackEventRequest(BaseModel):
+    event_type: str
+    control_id: str
+    # Add other relevant fields like state_before, state_after etc.
+
+# Define the rubric
+QUALITY_RUBRIC = {
+    "Specificity": "Is the control description specific and unambiguous? Does it avoid vague terms?",
+    "Actionability": "Does the description outline clear, repeatable actions or processes?",
+    "Evidence": "Does the description mention or allude to concrete evidence that can be audited (e.g., reports, logs, tickets)?",
+    "Clarity": "Is the language clear, concise, and free of jargon? Is it easy for a non-expert to understand?"
+}
 
 controls: List[Control] = []
 
@@ -228,25 +248,43 @@ async def suggest_improvements(request: Request, control_id: str):
     return templates.TemplateResponse("suggestions.html", {"request": request, "control": control})
 
 
+# In main.py
+
+
 @app.post("/controls/{control_id}/assess", response_class=HTMLResponse)
-async def create_assessment(request: Request, control_id: str):
-    if not GEMINI_MODEL:
-        return HTMLResponse("<div class='text-red-500 p-2'>Gemini is not configured.</div>")
-        
+async def generate_initial_assessment(request: Request, control_id: str):
+    """
+    Generates the INITIAL baseline assessment for a control by calling the Gemini API,
+    using a best-practice document for grounding, and returns the complete
+    workspace HTML fragment.
+    """
     control = find_control_by_id(control_id)
     if not control:
         raise HTTPException(status_code=404, detail="Control not found")
 
+    # --- ENHANCED PROMPT WITH GROUNDING ---
+    # We provide the best_practice.md file as a high-quality example.
+    # This "few-shot" prompting guides the model to produce output that
+    # matches our desired structure, tone, and level of detail.
     prompt = f"""
-    You are an expert IT auditor. Your task is to write a formal control assessment document in Markdown format.
+    You are an expert IT risk and compliance advisor. Your task is to write a formal control assessment document in Markdown format.
+    Use the best-practice framework below as a reference for the structure and quality of your response.
+
+    ---
+    **BEST-PRACTICE FRAMEWORK REFERENCE:**
+    {BEST_PRACTICE_ASSESSMENT}
+    ---
+
+    Now, generate a new assessment for the following specific control:
 
     **Information Provided:**
-    - **Risk Description:** "{control.risk_text}"
-    - **Control Description:** "{control.control_text}"
+    - **Control Name:** "{control.name}"
+    - **Risk it Addresses:** "{control.risk_text}"
+    - **Current Control Description:** "{control.control_text}"
 
     **Your Task:**
     Write a concise assessment document that clearly explains why the control is effective at mitigating the specified risk.
-    Structure your response with the following sections:
+    Structure your response with these Markdown sections:
     
     ### Control Assessment: {control.name}
 
@@ -259,11 +297,130 @@ async def create_assessment(request: Request, control_id: str):
     **3. Potential Evidence for Audit:**
     A bulleted list of potential artifacts an auditor could request to verify the control is operating as described.
     """
-    
-    # Per the migration guide, we call `generate_content()`.
-    response = GEMINI_MODEL.generate_content(prompt)
-    markdown_text = response.text
-    html_output = md.render(markdown_text)
-    control.assessment_document = html_output 
 
-    return templates.TemplateResponse("assessment.html", {"request": request, "control": control})
+    # --- Call Gemini and process the response ---
+    if GEMINI_MODEL:
+        try:
+            # --- LIVE API CALL ---
+            print(f"Generating assessment for control ID: {control.id}")
+            response = GEMINI_MODEL.generate_content(prompt)
+            markdown_text = response.text
+            print(f"Successfully received Gemini response for control ID: {control.id}")
+
+        except Exception as e:
+            # --- ROBUST ERROR HANDLING ---
+            # If the API call fails, log the error and show a user-friendly message.
+            print(f"ERROR: Gemini API call failed for control ID {control.id}. Details: {e}")
+            markdown_text = """
+            ### <span style="color: red;">Error Generating Assessment</span>
+            
+            An error occurred while communicating with the AI model. Please try again in a few moments.
+            If the problem persists, please check the server logs for more details.
+            """
+    else:
+        # Fallback if Gemini is not configured at all
+        markdown_text = "### Gemini Not Configured\n\nThis is a placeholder assessment because the AI model is not available."
+
+    html_output = md.render(markdown_text)
+    
+    # Use dot notation to update the Pydantic model instance
+    control.assessment_document = html_output
+
+    # Return the entire workspace partial, now populated with the new assessment
+    return templates.TemplateResponse(
+        "partials/assessment_workspace.html", # This partial contains the whole flow
+        {"request": request, "control": control}
+    )
+
+# --- Feature 1.2: Refine Assessment ---
+@app.post("/controls/refine", response_class=HTMLResponse)
+async def refine_assessment(request: Request, data: RefineRequest):
+    """Takes user's current assessment and returns AI-powered refinement snippets."""
+    
+    # Advanced Prompt for Gemini: Ask for structured JSON output
+    prompt = f"""
+    You are a GRC expert reviewing the following control assessment.
+    Your task is to identify the three weakest areas and provide specific, improved replacement text.
+
+    ASSESSMENT TEXT:
+    ---
+    {data.current_html}
+    ---
+
+    Based on the text, return a JSON array of 3 objects. Each object must have these keys:
+    - "rationale": A short (1-2 sentence) reason why this section needs improvement.
+    - "original_snippet": The exact, original HTML snippet from the assessment that should be replaced.
+    - "revised_snippet": The new, improved HTML snippet.
+
+    Return ONLY the JSON array.
+    """
+    
+    # In a real app, add error handling and JSON parsing
+    # response = GEMINI_MODEL.generate_content(prompt)
+    # refinements = json.loads(response.text)
+    
+    # For dev, use mock data
+    refinements = [
+        {"rationale": "The mention of 'periodic checks' is too vague for an audit.", "original_snippet": "<p>Periodic checks are performed.</p>", "revised_snippet": "<p>A quarterly access review is conducted by the system owner, evidenced by a signed report.</p>"},
+        {"rationale": "This lacks a measurable target for remediation.", "original_snippet": "<p>Vulnerabilities are addressed.</p>", "revised_snippet": "<p>Critical vulnerabilities identified are remediated within a 30-day SLA.</p>"},
+    ]
+    
+    return templates.TemplateResponse(
+        "partials/refinement_card.html",
+        {"request": request, "refinements": refinements}
+    )
+
+# --- Feature 1.3: Check Quality ---
+@app.post("/controls/check-quality", response_class=HTMLResponse)
+async def check_quality(request: Request, data: QualityCheckRequest):
+    """Evaluates text against a rubric and returns OOB swap fragments."""
+    
+    # Prompt for Gemini to evaluate against the rubric
+    prompt = f"""
+    You are an AI auditor. Evaluate the following assessment text against the quality rubric.
+    For each criterion, decide if it is "met" or "unmet".
+
+    RUBRIC:
+    {json.dumps(QUALITY_RUBRIC, indent=2)}
+
+    ASSESSMENT TEXT:
+    ---
+    {data.assessment_html}
+    ---
+
+    Return a JSON object with two keys: "met_criteria" and "unmet_criteria",
+    which are arrays of the criteria names you evaluated. Example: {{"met_criteria": ["Clarity"], "unmet_criteria": ["Specificity", "Evidence"]}}
+    Return ONLY the JSON object.
+    """
+    
+    # In a real app, parse the response from Gemini
+    # For dev, use mock data
+    results = {"met_criteria": ["Clarity", "Actionability"], "unmet_criteria": ["Specificity", "Evidence"]}
+
+    # Prepare context for the templates
+    context = {
+        "request": request,
+        "results": results,
+        "rubric": QUALITY_RUBRIC,
+        "total_criteria": len(QUALITY_RUBRIC)
+    }
+    
+    # Render two separate templates for OOB Swap
+    status_bar_html = templates.get_template("partials/quality_status_bar.html").render(context)
+    modal_html = templates.get_template("partials/quality_modal.html").render(context)
+    
+    # Combine them into a single response
+    return HTMLResponse(content=status_bar_html + modal_html)
+
+#Vertex Evaluation
+def log_to_vertex_ai_evaluation(payload: dict):
+    """Placeholder for the actual Vertex AI SDK call."""
+    print(f"TRACKING EVENT TO VERTEX AI: {payload}")
+    # Here you would use the Vertex AI SDK to log this data.
+    # e.g., evaluation_service_client.log_event(...)
+
+@app.post("/track_event")
+async def track_event(data: TrackEventRequest, background_tasks: BackgroundTasks):
+    """Receives tracking events from the frontend and logs them."""
+    background_tasks.add_task(log_to_vertex_ai_evaluation, data.dict())
+    return {"status": "event received"}

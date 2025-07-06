@@ -1,112 +1,145 @@
-# AI-Powered GRC Control Co-pilot
+# Functional Specification: Open GRC v0.0.2 - Interactive Assessment Workspace
 
-[![Release](https://img.shields.io/github/v/release/pat-ladon/aicontrol)](https://github.com/pat-ladon/aicontrol/releases)
-[![Python Version](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![Framework](https://img.shields.io/badge/FastAPI-0.110.0-green.svg)](https://fastapi.tiangolo.com/)
-[![Deployed On](https://img.shields.io/badge/Deployed%20On-Google%20Cloud%20Run-lightgrey.svg)](https://cloud.google.com/run)
+**Version:** 0.0.2
+**Date:** July 6, 2025
+**Author:** Patrick
 
-This application is a prototype of an AI-powered "Co-pilot" designed to assist GRC analysts, IT auditors, and control owners in their daily tasks. It leverages a generative AI backend (Google Gemini) to accelerate the creation of high-quality control documentation and proactively identify areas for control improvement.
+## 1. Product Vision & Goals
 
-The primary goal is to reduce the manual effort, enhance the consistency, and improve the quality of control assessments, ultimately leading to a stronger compliance posture and more efficient audit cycles.
+Version 2.1 of the AI-Powered GRC Control Co-pilot refines the application into an intelligent and interactive **assessment workspace**.
 
-**Live Demo:** `https://aicontrol-xxxxxxxx-uc.a.run.app` (Protected by demo passcode)
+The primary goal is to empower GRC analysts and control owners to **iteratively craft, refine, and improve** their control assessments directly within the application. This will be achieved by introducing stateful, per-control workspaces with session persistence, contextual AI-driven refinement suggestions, and a qualitative feedback system designed to guide, not grade.
 
-## Functional Specification
+We are explicitly **removing a numerical score** to reduce user anxiety and focus them on actionable improvements, ensuring a more intuitive and encouraging user experience. A supporting backend tracking system will measure the effectiveness of our AI assistance for continuous product improvement.
 
-### 1. Core GRC Workflow
+## 2. Core Data Model: Per-Control Session State
 
-The application provides a foundational interface for managing a catalog of IT general controls.
+To enable iterative, per-control work, all session-specific data will be stored in the user's browser `localStorage`. This data is structured to be isolated for each control and easily extendible.
 
-#### 1.1. Control Listing & Master-Detail View
+- **Storage Mechanism:** Browser `localStorage`
+- **Key Naming Convention:** `grc-copilot-assessment-{control_id}`
+  - _Example:_ `grc-copilot-assessment-AC-02`
+- **Value Data Structure:** A JSON object with the following schema:
 
-- **Description:** On launch, the system presents a master-detail layout. A scrollable list of all controls is displayed in the left-hand navigation pane.
-- **UI:** The list view is compact, displaying the control `Name`, `Owner`, and `Risk ID` for quick identification.
-- **Action:** Clicking a control in the list dynamically loads its full details into the main content area without a page refresh.
+```json
+{
+  "controlId": "string", // e.g., "AC-02"
+  "lastModified": "ISO_8601_timestamp", // Updated on every change
+  "status": "string", // 'pristine' | 'in-progress' | 'checked'
+  "workspaceHtml": "string", // The user's current, edited HTML content
+  "initialGenerationHtml": "string", // The pristine AI-generated HTML, for comparison
+  "lastQualityCheck": {
+    // Object, null if not yet checked
+    "met_criteria": ["string"], // e.g., ["Clarity", "Actionability"]
+    "unmet_criteria": ["string"] // e.g., ["Specificity", "Evidence"]
+  },
+  "lastRefinements": [
+    // Array of objects, empty if none generated
+    {
+      "rationale": "string",
+      "revised_snippet": "string"
+    }
+  ]
+}
+```
 
-#### 1.2. Control Detail View
+---
 
-- **Description:** The main content area displays the full, read-only details for the selected control, including its name, status, owner, a detailed `Risk Description`, and the current `Control Description`.
-- **Acceptance Criteria:** All data loaded from the master `controls.csv` is accurately displayed.
+## Feature Vector 1: The Guided Assessment Workspace
 
-#### 1.3. Dynamic Search & Filtering
+### Feature 1.1: Interactive & Persistent Assessment Workspace
 
-- **Description:** A search bar in the left pane allows for real-time, dynamic filtering of the control list.
-- **Logic:** The search is performed against the control's name, owner, risk ID, and status. The list updates instantly as the user types.
-- **Technology:** Implemented via HTMX, this functionality sends search queries to the backend and swaps the table body with the filtered results, preventing full page reloads.
+- **User Story:** As a GRC analyst, I want to generate a baseline assessment, make my own edits, and have my work automatically saved for each control, so that I can switch between tasks or refresh the page without losing my progress during a session.
 
-### 2. AI-Powered Enrichment (Core Features)
+- **Description of Functionality:**
 
-This is the primary value-add of the application, where generative AI assists the user in analyzing and documenting controls.
+  1.  When a user selects a control, the application will check `localStorage` for a corresponding state object.
+  2.  If state exists, the `workspaceHtml` is loaded into an editable area.
+  3.  The assessment display area will be converted into a rich text editor (`contenteditable="true"` `div`).
+  4.  Any user edits to the assessment text will automatically update the `workspaceHtml` and `lastModified` fields in the control's `localStorage` object.
+  5.  A "Reset" button will allow the user to clear the workspace and the associated `localStorage` entry for that control.
 
-#### 2.1. AI-Generated Control Assessment
+- **Acceptance Criteria:**
+  - [ ] When a control is selected, its saved assessment text is correctly loaded from `localStorage`.
+  - [ ] User edits in the assessment workspace are persisted in `localStorage` in real-time.
+  - [ ] Upon refreshing the page and re-selecting a control, the user's last-edited text is displayed.
 
-- **User Story:** As a GRC analyst, I want to automatically generate a formal assessment document for a control, so that I can ensure a standardized, auditable rationale is recorded for how it mitigates its associated risk.
-- **Action:** From the control detail view, the user clicks the "Generate Assessment" button.
-- **System Process:**
-  1.  The backend sends the specific `Risk Description` and `Control Description` to the Google Gemini API.
-  2.  The prompt instructs the model to act as an expert IT auditor and generate a structured document in Markdown format.
-  3.  The generated document includes a "Summary of Mitigation," "Key Mitigation Points," and "Potential Evidence for Audit."
-- **UI Response:** The backend converts the generated Markdown to HTML and sends the formatted snippet back to the client. HTMX swaps this content into a designated area below the control details, rendering it instantly.
+### Feature 1.2: Contextual Improvement Snippets
 
-#### 2.2. AI-Powered Improvement Suggestions
+- **User Story:** As a control owner, after writing my assessment, I want the AI to give me 3 specific, clickable suggestions to improve weak areas, so I can instantly upgrade the quality of my documentation.
 
-- **User Story:** As a control owner, I want to receive actionable suggestions on how to improve my control, so that I can proactively strengthen our security posture and mature our control environment.
-- **Action:** From the control detail view, the user clicks the "Suggest Improvements" button.
-- **System Process:**
-  1.  The backend sends the control's risk/description text to the Gemini API.
-  2.  **Crucially, the prompt is "grounded"** with the content of `best_practice.md`, which contains a framework for a best-in-class control.
-  3.  The model is instructed to compare the user's current control against the best-practice framework and provide 3-5 specific, actionable recommendations for improvement (e.g., adding metrics, improving automation, enhancing evidence collection).
-- **UI Response:** The generated list of suggestions is converted from Markdown to HTML and rendered dynamically in the UI via HTMX.
+- **Description of Functionality:**
 
-### 3. Security
+  1.  A "Refine My Assessment" button appears below the workspace.
+  2.  Clicking it sends the current `workspaceHtml` for that control to a backend endpoint.
+  3.  The AI analyzes the text and returns 3 targeted improvement suggestions.
+  4.  Each suggestion is displayed as a card with a rationale ("Why fix this?") and an "Apply Suggestion" button.
+  5.  Clicking "Apply" replaces the relevant portion of the text in the workspace with the AI's improved snippet.
 
-#### 3.1. Demo Access Control
+- **Acceptance Criteria:**
+  - [ ] The "Refine My Assessment" button successfully calls the backend with the current assessment text.
+  - [ ] The backend returns 3 distinct, actionable suggestions.
+  - [ ] Suggestions are rendered correctly as cards in the UI.
+  - [ ] Clicking "Apply Suggestion" correctly updates the text in the assessment workspace and saves it to `localStorage`.
 
-- **Description:** To protect the application and prevent unauthorized use of the Gemini API during a demo, the entire application is protected by a "passcode wall."
-- **Implementation:** A FastAPI middleware intercepts all incoming requests. If a valid session cookie is not present, the user is presented with a full-screen HTML dialog prompting for a passcode.
-- **Acceptance Criteria:** No application endpoints (except `/login`) are accessible without first submitting the correct passcode.
+### Feature 1.3: Qualitative "Quality Rubric" Feedback
 
-## Technology Stack & Architecture
+- **User Story:** As a GRC analyst, I want to check my assessment against best practices and get clear, actionable feedback on what I've done well and what I still need to fix, so I can confidently improve my work.
 
-- **Backend:**
-  - **Framework:** FastAPI
-  - **Web Server:** Gunicorn with Uvicorn workers (for production)
-  - **AI:** Google Gemini via the `google-cloud-aiplatform` SDK
-  - **Data Source:** CSV file (for prototype simplicity)
-- **Frontend:**
-  - **Dynamic UI:** HTMX
-  - **Styling:** Tailwind CSS (with Typography plugin)
-- **Deployment Architecture:**
-  - **Platform:** Google Cloud Run
-  - **Method:** The application is packaged as a container using a `Dockerfile`. The `gcloud run deploy` command builds this container, pushes it to Google Artifact Registry, and deploys it as a serverless, auto-scaling service. This architecture is cost-effective (scales to zero) and highly scalable.
+- **Description of Functionality:**
 
-## Setup and Deployment
+  1.  A "Check Quality" button will be available.
+  2.  Clicking it sends the current `workspaceHtml` to an analysis endpoint.
+  3.  The backend evaluates the text against a pre-defined quality rubric (e.g., Specificity, Clarity, Evidence).
+  4.  A status bar appears at the bottom of the screen showing a summary of the check (e.g., "3 of 4 Key Areas Addressed").
+  5.  Clicking the status bar opens a modal window displaying a detailed checklist, clearly showing which criteria were met and which need improvement.
 
-### Prerequisites
+- **Implementation Details:**
 
-- Python 3.11+
-- Google Cloud SDK (`gcloud`) authenticated to your account
-- Node.js and npm (for managing Tailwind CSS)
+  - **Data Model:** A `QUALITY_RUBRIC` dictionary will be defined in the backend, mapping criteria names to their descriptions.
+  - **Backend (New Endpoint):** `POST /controls/check-quality`
+    - **Request Body:** `{ "assessment_text": "<html>...</html>" }`
+    - **Logic:** Use a Gemini prompt to evaluate the text against the rubric. The model will return a JSON object classifying each rubric item as "met" or "unmet".
+    - **Response Body:** The endpoint will return multiple HTML snippets using HTMX's Out-of-Band Swap feature: one for the status bar and one for the modal's content.
+  - **Frontend:**
+    - A "Check Quality" button triggers the `hx-post`.
+    - HTMX renders the status bar and populates the (initially hidden) modal.
+    - A simple JavaScript function handles showing/hiding the modal on click.
+    - The quality check results are saved to the `lastQualityCheck` object in `localStorage`.
 
-### Local Development
+- **Acceptance Criteria:**
+  - [ ] Clicking "Check Quality" triggers a request and displays a status bar at the bottom of the page.
+  - [ ] The status bar accurately reflects the number of met vs. total quality criteria.
+  - [ ] Clicking the status bar opens a modal window.
+  - [ ] The modal correctly displays the checklist of met and unmet criteria.
 
-1.  **Clone the repository:** `git clone https://github.com/YOUR_USER/aicontrol.git`
-2.  **Create a virtual environment:** `python -m venv venv && source venv/bin/activate`
-3.  **Install dependencies:** `pip install -r requirements.txt` and `npm install`
-4.  **Create `.env` file:** Copy `.env.example` to `.env` and fill in your `DEMO_PASSCODE` and `SECRET_KEY`.
-5.  **Run the Tailwind build:** `npx tailwindcss -i ./src/input.css -o ./static/styles.css --watch`
-6.  **Run the FastAPI server:** `uvicorn main:app --reload`
+---
 
-### Cloud Deployment
+## Feature Vector 2: Centralized Effectiveness Tracking
 
-1.  **Authenticate gcloud:** `gcloud auth login`
-2.  **Set your project:** `gcloud config set project YOUR_GCP_PROJECT_ID`
-3.  **Enable APIs:** `gcloud services enable run.googleapis.com artifactregistry.googleapis.com`
-4.  **Deploy:** Run the `gcloud run deploy` command, passing secrets via `--set-env-vars`:
-    ```bash
-    gcloud run deploy aicontrol \
-      --source . \
-      --region us-central1 \
-      --allow-unauthenticated \
-      --set-env-vars="DEMO_PASSCODE=YOUR_DEMO_PASSCODE,SECRET_KEY=YOUR_SECRET_KEY"
-    ```
+### Feature 2.1: Co-pilot Interaction Logging for Vertex AI Evaluation
+
+- **User Story:** As a Product Manager, I want to centrally log key user interactions with the AI features, so I can quantitatively measure their helpfulness and make data-driven decisions to improve the co-pilot's underlying models and prompts.
+
+- **Description of Functionality:**
+  Key user interactions that signal the usefulness of AI suggestions will be captured on the frontend and sent to a backend tracking endpoint. This endpoint will format the data and log it to the Google Vertex AI Evaluation service for centralized analysis.
+
+- **Trackable Events:**
+
+  - `assessment_generated`: User generates the initial assessment.
+  - `refinement_suggestion_applied`: User clicks "Apply Suggestion." **(High-value positive signal)**
+  - `quality_check_requested`: User requests a quality rubric check.
+
+- **Implementation Details:**
+
+  - **Backend (New Endpoint):** `POST /track_event`
+    - This will be an asynchronous endpoint.
+    - **Request Body:** A JSON object with event details (e.g., `event_type`, `control_id`, `state_before`, `state_after`).
+    - **Logic:** Formats the payload and logs it to the Vertex AI Evaluation service.
+  - **Frontend:** JavaScript functions tied to user actions will send a `fetch` request with the event payload to the `/track_event` endpoint.
+  - **Cloud Platform:** An Evaluation Job in the Google Cloud Console will be configured to aggregate these logs and compute metrics like "suggestion acceptance rate."
+
+- **Acceptance Criteria:**
+  - [ ] When a user applies a refinement suggestion, a `POST` request is sent to `/track_event` with the correct payload.
+  - [ ] When a user requests a quality check, a corresponding event is logged.
+  - [ ] Data appears in the configured Vertex AI Evaluation dashboard, allowing for analysis.

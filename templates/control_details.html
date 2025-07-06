@@ -1,8 +1,12 @@
-<div class="p-4 bg-secondary-100 dark:bg-secondary-850 shadow h-full">
+<!-- templates/control_details.html -->
+
+<div class="p-4">
   <h2 class="text-xl font-bold mb-2 text-neutral-900 dark:text-neutral-100">
     {{ control.name }}
   </h2>
+
   <div class="space-y-4">
+    <!-- Risk & Control Description (Unchanged) -->
     <div>
       <h3 class="font-semibold text-sm text-gray-600 dark:text-gray-400">
         Risk Description
@@ -19,41 +23,12 @@
         {{ control.control_text }}
       </p>
     </div>
-    <hr class="dark:border-secondary-700" />
-    <div class="flex space-x-2">
-      <!-- CHANGED: Removed rounded -->
-      <button
-        class="bg-primary-600 text-white px-4 py-2 text-sm font-medium hover:bg-opacity-90"
-        hx-post="/controls/{{ control.id }}/assess"
-        hx-target="#assessment-output"
-        hx-swap="innerHTML"
-        hx-indicator="#assessment-spinner"
-      >
-        Generate Assessment
-      </button>
-      <!-- CHANGED: Removed rounded -->
-      <button
-        class="bg-gray-500 text-white px-4 py-2 text-sm font-medium hover:bg-gray-600"
-        hx-post="/controls/{{ control.id }}/suggest"
-        hx-target="#suggestions-output"
-        hx-swap="innerHTML"
-        hx-indicator="#suggestions-spinner"
-      >
-        Suggest Improvements
-      </button>
-    </div>
-    <div id="assessment-output">
-      <div id="assessment-spinner" class="htmx-indicator">
-        Loading Assessment...
-      </div>
-      {% if control.assessment_document %}{% include 'assessment.html' %}{%
-      endif %}
-    </div>
-    <div id="suggestions-output">
-      <div id="suggestions-spinner" class="htmx-indicator">
-        Loading Suggestions...
-      </div>
-      {% if control.suggestions %}{% include 'suggestions.html' %}{% endif %}
-    </div>
+
+    <!-- This single block now includes our entire interactive workspace component -->
+    {% include 'partials/assessment_workspace.html' %}
+
+    <!-- Output areas for AI suggestions (These remain outside the component) -->
+    <div id="refinements-output" class="mt-4 space-y-3"></div>
+    <div id="quality-check-container"></div>
   </div>
 </div>
