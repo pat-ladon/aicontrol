@@ -45,10 +45,15 @@ module.exports = {
         600: "#4b5563",
         800: "#1f2937",
       },
+      red: { 600: "#DC2626" },
     },
     // The 'extend' block is now used for non-color extensions if needed.
     extend: {
       // You can extend fonts, spacing, etc. here later.
+      boxShadow: {
+        "glass-inset": "inset 0 1px 4px 0 rgb(0 0 0 / 0.1)",
+        "glass-sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      },
     },
   },
 
