@@ -1,90 +1,75 @@
-<!-- This single file now represents the entire workspace "component" -->
-<div
-  id="assessment-workspace-wrapper"
-  class="flex flex-col bg-secondary-100 dark:bg-secondary-850 border border-secondary-200 dark:border-secondary-700 shadow mt-4"
->
-  <!-- 1. The Main Content Area -->
-  <div
-    id="assessment-workspace-content"
-    class="prose prose-sm dark:prose-invert max-w-none p-4 flex-grow"
-  >
-    {% if control.assessment_document %}
-    <!-- ACTIVE STATE: If assessment exists, display it and make it editable -->
-    {{ control.assessment_document | safe }}
-    <script>
-      // Initialize the localStorage state and make the div editable
-      (function () {
-        if (
-          window.grc &&
-          typeof window.grc.initializeWorkspace === "function"
-        ) {
-          window.grc.initializeWorkspace("{{ control.id }}");
-        }
-      })();
-    </script>
-    {% else %}
-    <!-- EMPTY STATE: If no assessment, show a placeholder -->
-    <div class="text-center p-6">
-      <h3 class="font-semibold text-lg text-neutral-900 dark:text-neutral-100">
-        No Assessment Generated
-      </h3>
-      <p class="text-gray-600 dark:text-gray-400 mt-2 mb-4">
-        This control has no baseline assessment. Generate one to begin.
+<!-- START: templates/partials/assessment_workspace.html (with all UI tweaks) -->
+
+<div class="mt-6 border-t border-secondary-200 dark:border-secondary-700 pt-4">
+  <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+    Control Assessment
+  </h3>
+
+  <form class="space-y-8">
+    <!-- Section 1: Control Operation -->
+    <div>
+      <label
+        for="control-op-{{ control.id }}"
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+      >
+        1. Control Operation
+      </label>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+        Describe how the control operates on a day-to-day basis.
       </p>
+      <textarea
+        id="control-op-{{ control.id }}"
+        name="control_operation"
+        rows="4"
+        class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        placeholder="e.g., User access is reviewed on a quarterly basis by line managers..."
+      ></textarea>
     </div>
-    {% endif %}
-  </div>
 
-  <!-- 2. The Action Bar -->
-  <div
-    class="flex items-center space-x-3 p-3 bg-secondary-200/50 dark:bg-secondary-900/50 border-t border-secondary-200 dark:border-secondary-700"
-  >
-    {% if not control.assessment_document %}
-    <!-- EMPTY STATE ACTION -->
-    <button
-      class="bg-primary-600 text-white font-bold py-2 px-4 hover:bg-opacity-90 flex-grow"
-      hx-post="/controls/{{ control.id }}/assess"
-      hx-target="#assessment-workspace-wrapper"
-      hx-swap="outerHTML"
-      hx-indicator="#generate-spinner"
-    >
-      Generate Baseline Assessment
-    </button>
-    <span id="generate-spinner" class="htmx-indicator text-sm">Working...</span>
-    {% else %}
-    <!-- ACTIVE STATE ACTIONS -->
-    <button
-      class="bg-blue-600 text-white px-4 py-2 font-medium"
-      hx-post="/controls/refine"
-      hx-target="#refinements-output"
-      hx-trigger="click"
-      hx-vals="js:{current_html: document.getElementById('assessment-workspace-content').innerHTML, control_id: '{{ control.id }}'}"
-      hx-indicator="#refine-spinner"
-    >
-      Refine
-    </button>
-    <button
-      class="bg-gray-600 text-white px-4 py-2 font-medium"
-      hx-post="/controls/check-quality"
-      hx-target="#quality-check-container"
-      hx-swap="innerHTML"
-      hx-vals="js:{assessment_html: document.getElementById('assessment-workspace-content').innerHTML}"
-      hx-indicator="#quality-spinner"
-    >
-      Check Quality
-    </button>
-    <div class="flex-grow"></div>
-    <!-- Spacer -->
-    <button
-      class="bg-red-700 text-white px-4 py-2 font-medium"
-      onclick="grc.resetWorkspace('{{ control.id }}')"
-    >
-      Reset
-    </button>
+    <!-- Section 2: Design & Implementation Details -->
+    <div class="pt-8 border-t border-secondary-200 dark:border-secondary-700">
+      <label
+        for="design-impl-{{ control.id }}"
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+      >
+        2. Design & Implementation Details
+      </label>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+        Provide technical details about how the control is designed and
+        implemented.
+      </p>
+      <textarea
+        id="design-impl-{{ control.id }}"
+        name="design_implementation"
+        rows="4"
+        class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        placeholder="e.g., The control is enforced via a scheduled script (verify_access.py) that runs on the 1st of each month..."
+      ></textarea>
+    </div>
 
-    <!-- Spinners for active state -->
-    <span id="refine-spinner" class="htmx-indicator text-sm">Refining...</span>
-    <span id="quality-spinner" class="htmx-indicator text-sm">Checking...</span>
-    {% endif %}
-  </div>
+    <!-- Section 3: Evidence Description -->
+    <div
+      class="mt-8 pt-8 border-t border-secondary-200 dark:border-secondary-700"
+    >
+      <label
+        for="evidence-desc-{{ control.id }}"
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+      >
+        3. Evidence Description
+      </label>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+        Describe the evidence you would provide to an auditor to prove this
+        control is effective.
+      </p>
+      <textarea
+        id="evidence-desc-{{ control.id }}"
+        name="evidence_description"
+        rows="4"
+        class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        placeholder="e.g., Provide screenshots of the completed access review tickets from Jira, and a list of deprovisioned users from the Active Directory logs..."
+      ></textarea>
+    </div>
+  </form>
 </div>
+
+<!-- END: templates/partials/assessment_workspace.html -->

@@ -1,145 +1,164 @@
-# Functional Specification: Open GRC v0.0.2 - Interactive Assessment Workspace
+Of course. This is the perfect way to approach a project like this: define the absolute Minimum Viable Product (MVP) that delivers value quickly and provides a foundation for future iteration.
 
-**Version:** 0.0.2
-**Date:** July 6, 2025
-**Author:** Patrick
+Here is the functional specification for version 0.1, rewritten from the ground up with a focus on speed of development and a detailed, step-by-step implementation plan.
+
+---
+
+# Functional Specification: GRC Co-pilot v0.1 - The Core Assistant MVP
+
+**Version:** 0.1  
+**Author:** Product Manager
 
 ## 1. Product Vision & Goals
 
-Version 2.1 of the AI-Powered GRC Control Co-pilot refines the application into an intelligent and interactive **assessment workspace**.
+Version 0.1 is the foundational MVP of the GRC Co-pilot. We assume our users are skilled professionals who prefer to write their own assessments. Our goal is to augment, not replace, their manual workflow by providing targeted AI tools that solve their most tedious tasks with one-click simplicity.
 
-The primary goal is to empower GRC analysts and control owners to **iteratively craft, refine, and improve** their control assessments directly within the application. This will be achieved by introducing stateful, per-control workspaces with session persistence, contextual AI-driven refinement suggestions, and a qualitative feedback system designed to guide, not grade.
+This version prioritizes speed of development and immediate user value. The features are designed to be implemented quickly using the existing FastAPI and HTMX stack, with all user-facing state managed exclusively in `localStorage`. This will provide a stable, useful tool and a rich data stream for evaluating its effectiveness.
 
-We are explicitly **removing a numerical score** to reduce user anxiety and focus them on actionable improvements, ensuring a more intuitive and encouraging user experience. A supporting backend tracking system will measure the effectiveness of our AI assistance for continuous product improvement.
+## 2. Core Features for v0.1
 
-## 2. Core Data Model: Per-Control Session State
+### Feature 1: The Structured Assessment Workspace
 
-To enable iterative, per-control work, all session-specific data will be stored in the user's browser `localStorage`. This data is structured to be isolated for each control and easily extendible.
+- **User Story:** As an analyst, I want a simple, structured form for each control to organize my thoughts and ensure I don't miss key sections. My work must be saved automatically so I don't lose it.
+- **Description:** The main content area is a simple HTML form with three `textarea` fields:
+  1.  Control Operation
+  2.  Design & Implementation Details
+  3.  Evidence Description
+- **Persistence:** All text entered is automatically saved to `localStorage`. The data is keyed by control and field, e.g., `grc-AC-02-evidence_description`.
 
-- **Storage Mechanism:** Browser `localStorage`
-- **Key Naming Convention:** `grc-copilot-assessment-{control_id}`
-  - _Example:_ `grc-copilot-assessment-AC-02`
-- **Value Data Structure:** A JSON object with the following schema:
+### Feature 2: One-Click "AI Polish"
 
-```json
-{
-  "controlId": "string", // e.g., "AC-02"
-  "lastModified": "ISO_8601_timestamp", // Updated on every change
-  "status": "string", // 'pristine' | 'in-progress' | 'checked'
-  "workspaceHtml": "string", // The user's current, edited HTML content
-  "initialGenerationHtml": "string", // The pristine AI-generated HTML, for comparison
-  "lastQualityCheck": {
-    // Object, null if not yet checked
-    "met_criteria": ["string"], // e.g., ["Clarity", "Actionability"]
-    "unmet_criteria": ["string"] // e.g., ["Specificity", "Evidence"]
-  },
-  "lastRefinements": [
-    // Array of objects, empty if none generated
-    {
-      "rationale": "string",
-      "revised_snippet": "string"
-    }
-  ]
-}
-```
+- **User Story:** My initial notes are rough. I want a one-click way to transform them into professional, audit-ready language for any section I'm working on.
+- **Description:** A "Polish" button is placed next to each `textarea`. Clicking it sends the current text to the backend and instantly replaces it with a professionally rephrased version.
+
+### Feature 3: AI-Powered Evidence Summarizer
+
+- **User Story:** I struggle to write formal descriptions for my evidence (like screenshots). I want to just describe what the evidence is and have the AI write the auditable summary for me.
+- **Description:** A simple, self-contained "Evidence Helper" tool on the page. It has one input field and a "Summarize Evidence" button. The user types a hint, clicks the button, and receives a formal summary snippet they can copy and paste.
+
+### Supporting Feature: Effectiveness Tracking
+
+- **Goal:** To lay the foundation for Feature Vector 2 by logging every meaningful AI interaction to a backend endpoint. This data is critical for measuring the value of our features.
+
+## 3. Step-by-Step MVP Implementation Plan
+
+This plan is ordered to build foundational features first, ensuring each step results in a testable and incrementally more valuable application.
 
 ---
 
-## Feature Vector 1: The Guided Assessment Workspace
+### **Step 1: Build the Foundation - The Structured Workspace UI**
 
-### Feature 1.1: Interactive & Persistent Assessment Workspace
+**Goal:** Replace the current generic detail view with the structured `textarea` form.
 
-- **User Story:** As a GRC analyst, I want to generate a baseline assessment, make my own edits, and have my work automatically saved for each control, so that I can switch between tasks or refresh the page without losing my progress during a session.
-
-- **Description of Functionality:**
-
-  1.  When a user selects a control, the application will check `localStorage` for a corresponding state object.
-  2.  If state exists, the `workspaceHtml` is loaded into an editable area.
-  3.  The assessment display area will be converted into a rich text editor (`contenteditable="true"` `div`).
-  4.  Any user edits to the assessment text will automatically update the `workspaceHtml` and `lastModified` fields in the control's `localStorage` object.
-  5.  A "Reset" button will allow the user to clear the workspace and the associated `localStorage` entry for that control.
-
-- **Acceptance Criteria:**
-  - [ ] When a control is selected, its saved assessment text is correctly loaded from `localStorage`.
-  - [ ] User edits in the assessment workspace are persisted in `localStorage` in real-time.
-  - [ ] Upon refreshing the page and re-selecting a control, the user's last-edited text is displayed.
-
-### Feature 1.2: Contextual Improvement Snippets
-
-- **User Story:** As a control owner, after writing my assessment, I want the AI to give me 3 specific, clickable suggestions to improve weak areas, so I can instantly upgrade the quality of my documentation.
-
-- **Description of Functionality:**
-
-  1.  A "Refine My Assessment" button appears below the workspace.
-  2.  Clicking it sends the current `workspaceHtml` for that control to a backend endpoint.
-  3.  The AI analyzes the text and returns 3 targeted improvement suggestions.
-  4.  Each suggestion is displayed as a card with a rationale ("Why fix this?") and an "Apply Suggestion" button.
-  5.  Clicking "Apply" replaces the relevant portion of the text in the workspace with the AI's improved snippet.
-
-- **Acceptance Criteria:**
-  - [ ] The "Refine My Assessment" button successfully calls the backend with the current assessment text.
-  - [ ] The backend returns 3 distinct, actionable suggestions.
-  - [ ] Suggestions are rendered correctly as cards in the UI.
-  - [ ] Clicking "Apply Suggestion" correctly updates the text in the assessment workspace and saves it to `localStorage`.
-
-### Feature 1.3: Qualitative "Quality Rubric" Feedback
-
-- **User Story:** As a GRC analyst, I want to check my assessment against best practices and get clear, actionable feedback on what I've done well and what I still need to fix, so I can confidently improve my work.
-
-- **Description of Functionality:**
-
-  1.  A "Check Quality" button will be available.
-  2.  Clicking it sends the current `workspaceHtml` to an analysis endpoint.
-  3.  The backend evaluates the text against a pre-defined quality rubric (e.g., Specificity, Clarity, Evidence).
-  4.  A status bar appears at the bottom of the screen showing a summary of the check (e.g., "3 of 4 Key Areas Addressed").
-  5.  Clicking the status bar opens a modal window displaying a detailed checklist, clearly showing which criteria were met and which need improvement.
-
-- **Implementation Details:**
-
-  - **Data Model:** A `QUALITY_RUBRIC` dictionary will be defined in the backend, mapping criteria names to their descriptions.
-  - **Backend (New Endpoint):** `POST /controls/check-quality`
-    - **Request Body:** `{ "assessment_text": "<html>...</html>" }`
-    - **Logic:** Use a Gemini prompt to evaluate the text against the rubric. The model will return a JSON object classifying each rubric item as "met" or "unmet".
-    - **Response Body:** The endpoint will return multiple HTML snippets using HTMX's Out-of-Band Swap feature: one for the status bar and one for the modal's content.
-  - **Frontend:**
-    - A "Check Quality" button triggers the `hx-post`.
-    - HTMX renders the status bar and populates the (initially hidden) modal.
-    - A simple JavaScript function handles showing/hiding the modal on click.
-    - The quality check results are saved to the `lastQualityCheck` object in `localStorage`.
-
-- **Acceptance Criteria:**
-  - [ ] Clicking "Check Quality" triggers a request and displays a status bar at the bottom of the page.
-  - [ ] The status bar accurately reflects the number of met vs. total quality criteria.
-  - [ ] Clicking the status bar opens a modal window.
-  - [ ] The modal correctly displays the checklist of met and unmet criteria.
+- **Backend Tasks:**
+  - Modify the main control detail endpoint (e.g., `GET /controls/{control_id}`).
+  - Ensure it uses a Jinja2 template (`templates/control_detail.html`) that contains the new form structure.
+- **Frontend Tasks (HTML/Templates):**
+  - Create `templates/control_detail.html`.
+  - Inside, design the form with three labeled `textarea` elements.
+  - **Crucially, give each `textarea` a predictable `id`** that includes the control ID, so it can be targeted by JavaScript and HTMX.
+    - _Example:_ `<textarea id="control-op-{{ control.id }}">...</textarea>`
 
 ---
 
-## Feature Vector 2: Centralized Effectiveness Tracking
+### **Step 2: Make it Usable - Session Persistence with `localStorage`**
 
-### Feature 2.1: Co-pilot Interaction Logging for Vertex AI Evaluation
+**Goal:** Ensure any text typed by the user is not lost when they switch controls or refresh the page.
 
-- **User Story:** As a Product Manager, I want to centrally log key user interactions with the AI features, so I can quantitatively measure their helpfulness and make data-driven decisions to improve the co-pilot's underlying models and prompts.
+- **Backend Tasks:** None. This is a purely client-side feature.
+- **Frontend Tasks (JavaScript):**
+  - Write a small block of vanilla JavaScript in your main template.
+  - **On Save:** Attach an `oninput` event listener to each `textarea`. When the user types, this function saves the content to `localStorage`.
+    - _Example Key:_ `localStorage.setItem(`grc-${control.id}-control-op`, event.target.value);`
+  - **On Load:** When the control detail page loads, the script must read from `localStorage` for each field and populate the `textarea`s if data exists.
 
-- **Description of Functionality:**
-  Key user interactions that signal the usefulness of AI suggestions will be captured on the frontend and sent to a backend tracking endpoint. This endpoint will format the data and log it to the Google Vertex AI Evaluation service for centralized analysis.
+---
 
-- **Trackable Events:**
+### **Step 3: Add the First "Magic" - The "AI Polish" Feature**
 
-  - `assessment_generated`: User generates the initial assessment.
-  - `refinement_suggestion_applied`: User clicks "Apply Suggestion." **(High-value positive signal)**
-  - `quality_check_requested`: User requests a quality rubric check.
+**Goal:** Implement the one-click text polishing feature.
 
-- **Implementation Details:**
+- **Backend Tasks:**
+  - Create a new FastAPI endpoint: `POST /ai/polish-text`.
+  - This endpoint accepts a single form field: `text: str = Form(...)`.
+  - **Prompt Engineering:** Implement the AI call. The prompt should be simple: _"Act as an expert GRC analyst. Rephrase the following text to be clear, concise, and professional for an audit report. Do not add new information. Text: [user's text]"_
+  - The endpoint returns the polished text as a simple `HTMLResponse`.
+- **Frontend Tasks (HTMX):**
+  - Add a "Polish" button next to each `textarea`.
+  - Configure the button with HTMX attributes to call the new endpoint. The key is using `hx-swap="value"` to directly update the `textarea`.
+    ```html
+    <textarea id="control-op-{{ control.id }}"></textarea>
+    <button
+      hx-post="/ai/polish-text"
+      hx-vals='{"text": document.getElementById("control-op-{{ control.id }}").value}'
+      hx-target="#control-op-{{ control.id }}"
+      hx-swap="value"
+      class="polish-button"
+      data-section="Control Operation"
+      data-control-id="{{ control.id }}"
+    >
+      Polish
+    </button>
+    ```
 
-  - **Backend (New Endpoint):** `POST /track_event`
-    - This will be an asynchronous endpoint.
-    - **Request Body:** A JSON object with event details (e.g., `event_type`, `control_id`, `state_before`, `state_after`).
-    - **Logic:** Formats the payload and logs it to the Vertex AI Evaluation service.
-  - **Frontend:** JavaScript functions tied to user actions will send a `fetch` request with the event payload to the `/track_event` endpoint.
-  - **Cloud Platform:** An Evaluation Job in the Google Cloud Console will be configured to aggregate these logs and compute metrics like "suggestion acceptance rate."
+---
 
-- **Acceptance Criteria:**
-  - [ ] When a user applies a refinement suggestion, a `POST` request is sent to `/track_event` with the correct payload.
-  - [ ] When a user requests a quality check, a corresponding event is logged.
-  - [ ] Data appears in the configured Vertex AI Evaluation dashboard, allowing for analysis.
+### **Step 4: Add the Second Tool - The Evidence Summarizer**
+
+**Goal:** Implement the self-contained evidence helper tool.
+
+- **Backend Tasks:**
+  - Create another new endpoint: `POST /ai/summarize-evidence`.
+  - It accepts one form field: `hint: str = Form(...)`.
+  - **Prompt Engineering:** _"You are an IT auditor. Convert the following hint about a piece of evidence into a formal sentence for an audit report. Hint: [user's hint]"_
+  - The endpoint returns the generated summary wrapped in a simple HTML `div` with a "Copy" button.
+- **Frontend Tasks (HTMX):**
+  - Add the "Evidence Helper" HTML structure to your main template. It needs an input field, a button, and a target `div` for the result.
+    ```html
+    <h4>Evidence Helper</h4>
+    <input
+      type="text"
+      id="evidence-hint-input"
+      placeholder="e.g., screenshot of user list"
+    />
+    <button
+      hx-post="/ai/summarize-evidence"
+      hx-vals='{"hint": document.getElementById("evidence-hint-input").value}'
+      hx-target="#evidence-summary-result"
+      id="summarize-btn"
+      data-control-id="{{ control.id }}"
+    >
+      Summarize Evidence
+    </button>
+    <div id="evidence-summary-result"></div>
+    ```
+
+---
+
+### **Step 5: Build the Business Foundation - Effectiveness Tracking**
+
+**Goal:** Create the logging endpoint and hook up the existing features to send data.
+
+- **Backend Tasks:**
+  - Create the final endpoint: `POST /track_event`. This should be an `async` function.
+  - It will accept a Pydantic model representing the event payload. For v0.1, it can just accept a `dict`.
+  - The function's only job is to print the received log to the console for now (e.g., `print(f"TRACKING EVENT: {event_data}")`). This validates the mechanism before integrating with Vertex AI.
+- **Frontend Tasks (JavaScript):**
+  - Add a new JavaScript function `trackEvent(payload)`. This function will use `fetch` to `POST` the JSON payload to `/track_event`.
+  - Modify the event listeners for the "Polish" and "Summarize" buttons. Use the `htmx:afterOnLoad` event to trigger the tracking call _after_ the AI response has been successfully loaded.
+  - **Example Payload for Polish:**
+    ```javascript
+    // In your HTMX event listener for the polish button...
+    const payload = {
+      event_type: "text_polished",
+      control_id: button.dataset.controlId,
+      context: {
+        section: button.dataset.section,
+        text_before: originalText, // You'll need to store this before the swap
+        text_after: event.detail.xhr.responseText,
+      },
+    };
+    trackEvent(payload);
+    ```
+
+By following this five-step plan, we can rapidly develop a highly valuable MVP that directly assists users in their core tasks, all while building the essential data foundation for future, more advanced features.

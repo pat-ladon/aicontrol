@@ -1,17 +1,17 @@
-<!-- templates/control_details.html -->
+<!-- START: templates/control_details.html -->
 
-<div class="p-4">
+<div class="p-3">
   <h2 class="text-xl font-bold mb-2 text-neutral-900 dark:text-neutral-100">
     {{ control.name }}
   </h2>
 
   <div class="space-y-4">
-    <!-- Risk & Control Description (Unchanged) -->
+    <!-- Risk & Control Description (These are read-only and good to keep) -->
     <div>
       <h3 class="font-semibold text-sm text-gray-600 dark:text-gray-400">
         Risk Description
       </h3>
-      <p class="text-neutral-900 dark:text-neutral-100">
+      <p class="prose prose-sm dark:prose-invert max-w-none">
         {{ control.risk_text }}
       </p>
     </div>
@@ -19,16 +19,14 @@
       <h3 class="font-semibold text-sm text-gray-600 dark:text-gray-400">
         Control Description
       </h3>
-      <p class="text-neutral-900 dark:text-neutral-100">
+      <p class="prose prose-sm dark:prose-invert max-w-none">
         {{ control.control_text }}
       </p>
     </div>
 
-    <!-- This single block now includes our entire interactive workspace component -->
+    <!-- This now includes our simple, structured form. -->
     {% include 'partials/assessment_workspace.html' %}
-
-    <!-- Output areas for AI suggestions (These remain outside the component) -->
-    <div id="refinements-output" class="mt-4 space-y-3"></div>
-    <div id="quality-check-container"></div>
   </div>
 </div>
+
+<!-- END: templates/control_details.html -->
