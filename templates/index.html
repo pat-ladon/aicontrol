@@ -1,4 +1,4 @@
-<!-- START: templates/index.html (with sidebar alignment fix) -->
+<!-- START: templates/index.html (with footer position fixed) -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -33,7 +33,6 @@
           class="w-1/4 bg-secondary-100 dark:bg-secondary-850 p-4 border-r border-secondary-200 dark:border-secondary-700 flex flex-col"
         >
           <div>
-            <!-- CHANGE 1: Added px-2 for horizontal padding -->
             <h2 class="text-lg font-semibold mb-4 px-3 py-2">
               Filter controls
             </h2>
@@ -48,7 +47,6 @@
               hx-indicator=".htmx-indicator"
             />
           </div>
-
           <div class="mt-6 flex-1 overflow-y-auto">
             <table class="w-full">
               <thead>
@@ -70,7 +68,6 @@
           id="main-content"
           class="w-3/4 p-4 overflow-y-auto bg-white dark:bg-secondary-800"
         >
-          <!-- This area will now be populated by HTMX -->
           <div
             class="p-4 bg-white dark:bg-secondary-800 h-full flex items-center justify-center"
           >
@@ -87,6 +84,17 @@
           </div>
         </main>
       </div>
+      <!-- <<< Main Grid div closes here -->
+
+      <!-- CHANGE: Footer is now outside the Main Grid div -->
+      <footer
+        class="h-8 bg-secondary-100 dark:bg-secondary-850 border-t border-secondary-200 dark:border-secondary-700 flex items-center"
+      >
+        <!-- NOTE: Removed 'fixed bottom-0 left-0 right-0' as flexbox now handles positioning -->
+        <div id="status-bar" class="w-full">
+          {% include 'partials/status_bar.html' %}
+        </div>
+      </footer>
     </div>
   </body>
 </html>

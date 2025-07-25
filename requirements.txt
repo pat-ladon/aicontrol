@@ -8,3 +8,4 @@ markdown-it-py
 python-dotenv
 itsdangerous
 gunicorn
+google-generativeai

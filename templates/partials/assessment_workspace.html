@@ -1,40 +1,40 @@
 <!-- START: templates/partials/assessment_workspace.html (with all UI tweaks) -->
 
-<div class="mt-6 border-t border-secondary-200 dark:border-secondary-700 pt-4">
-  <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+<div class="mt-8 border-t">
+  <h4 class="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-6">
     Control Assessment
-  </h3>
+  </h4>
 
   <form class="space-y-8">
     <!-- Section 1: Control Operation -->
     <div>
       <label
         for="control-op-{{ control.id }}"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg bg-neutral-50 dark:bg-neutral-700 px-4 py-2 border border-primary-200 dark:border-primary-600"
       >
-        1. Control Operation
+        1. {{ control.name }}
       </label>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Describe how the control operates on a day-to-day basis.
       </p>
       <textarea
         id="control-op-{{ control.id }}"
         name="control_operation"
         rows="4"
-        class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        class="mt-1 block w-full p-3 rounded-none border-gray-200 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         placeholder="e.g., User access is reviewed on a quarterly basis by line managers..."
       ></textarea>
     </div>
 
     <!-- Section 2: Design & Implementation Details -->
-    <div class="pt-8 border-t border-secondary-200 dark:border-secondary-700">
+    <div class="mt-6 border-b">
       <label
         for="design-impl-{{ control.id }}"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg bg-neutral-50 dark:bg-neutral-700 px-4 py-2 border border-primary-200 dark:border-primary-600"
       >
-        2. Design & Implementation Details
+        2. {{ control.name }}
       </label>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Provide technical details about how the control is designed and
         implemented.
       </p>
@@ -42,22 +42,20 @@
         id="design-impl-{{ control.id }}"
         name="design_implementation"
         rows="4"
-        class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        class="mt-1 block w-full p-3 rounded-none border-gray-200 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         placeholder="e.g., The control is enforced via a scheduled script (verify_access.py) that runs on the 1st of each month..."
       ></textarea>
     </div>
 
     <!-- Section 3: Evidence Description -->
-    <div
-      class="mt-8 pt-8 border-t border-secondary-200 dark:border-secondary-700"
-    >
+    <div class="mt-6">
       <label
         for="evidence-desc-{{ control.id }}"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        class="block text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg bg-neutral-50 dark:bg-neutral-700 px-4 py-2 border border-primary-200 dark:border-primary-600"
       >
-        3. Evidence Description
+        3. {{ control.name }}
       </label>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Describe the evidence you would provide to an auditor to prove this
         control is effective.
       </p>
@@ -65,11 +63,37 @@
         id="evidence-desc-{{ control.id }}"
         name="evidence_description"
         rows="4"
-        class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        class="mt-1 block w-full p-3 rounded-none border-gray-200 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         placeholder="e.g., Provide screenshots of the completed access review tickets from Jira, and a list of deprovisioned users from the Active Directory logs..."
       ></textarea>
+      <div class="flex justify-end space-x-2 mt-2">
+        <button
+          type="button"
+          class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
+          hx-post="/polish"
+          hx-include="closest textarea"
+          hx-target="closest textarea"
+        >
+          Polish
+        </button>
+        <button
+          type="button"
+          class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-sm"
+          hx-post="/review"
+          hx-include="closest textarea"
+          hx-target="closest div[id^='review-questions-']"
+        >
+          Review
+        </button>
+      </div>
+      <div
+        id="review-questions-{{ control.id }}-evidence_description"
+        class="mt-2 p-3 border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 rounded-lg"
+      >
+        <!-- Review questions will be loaded here -->
+      </div>
     </div>
   </form>
 </div>
 
-<!-- END: templates/partials/assessment_workspace.html -->
+<!-- End: templates/partials/assessment workspace.html (with all UI tweaks) -->

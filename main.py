@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import csv
 from typing import List, Optional
+import time
 
 from fastapi import FastAPI, Request, Form, HTTPException, Response
 from fastapi.templating import Jinja2Templates
@@ -35,7 +36,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         return templates.TemplateResponse("login_dialog.html", {"request": request, "error": None})
     
+class TimingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request.state.start_time = time.time()
+        response = await call_next(request)
+        return response
+    
 app.add_middleware(AuthMiddleware)
+app.add_middleware(TimingMiddleware)
+
 
 # --- Login Endpoint ---
 @app.post("/login")
@@ -87,7 +96,14 @@ def find_control_by_id(control_id: str) -> Optional[Control]:
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Serves the main index page with the list of all controls."""
-    return templates.TemplateResponse("index.html", {"request": request, "controls": controls})
+    response_time = time.time() - request.state.start_time
+    context = {
+        "request": request, 
+        "controls": controls,
+        "controls_count": len(controls),
+        "response_time": response_time
+    }
+    return templates.TemplateResponse("index.html", context)
 
 @app.post("/search", response_class=HTMLResponse)
 async def search_controls(request: Request, query: str = Form(...)):
@@ -118,8 +134,16 @@ async def get_control(request: Request, control_id: str):
     if not control:
         raise HTTPException(status_code=404, detail="Control not found")
     
+    response_time = time.time() - request.state.start_time
+    context = {
+        "request": request, 
+        "control": control,
+        "controls_count": len(controls),
+        "response_time": response_time
+    }
+
     # This endpoint now renders the simplified control_details.html,
     # which in turn includes the new assessment_workspace.html partial.
-    return templates.TemplateResponse("control_details.html", {"request": request, "control": control})
+    return templates.TemplateResponse("control_details.html", context)
 
 # --- END OF REVISED main.py ---
