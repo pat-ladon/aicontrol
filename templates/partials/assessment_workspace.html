@@ -1,195 +1,84 @@
-<!-- START: templates/partials/assessment_workspace.html -->
+<!-- START: templates/partials/assessment_workspace.html (with new filled button styles) -->
+
+{% macro assessment_section(control, number, title, id_slug, name_attr, helper_text, placeholder) %}
+<div class="pt-8 border-t border-secondary-200 dark:border-secondary-700 mt-8">
+  <label for="{{ id_slug }}-{{ control.id }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ number }}. {{ title }}</label>
+  <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ helper_text }}</p>
+  
+  <div id="textarea-wrapper-{{ id_slug }}-{{ control.id }}">
+    <textarea id="{{ id_slug }}-{{ control.id }}" name="{{ name_attr }}" rows="4" class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" placeholder="{{ placeholder }}"></textarea>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="mt-2 flex items-center space-x-2">
+    <!-- CHANGE: Replaced the entire class attribute with new styles -->
+    <button
+      type="button"
+      class="text-sm font-medium rounded-none px-4 py-2 border transition-colors bg-secondary-200 border-secondary-300 text-secondary-700 hover:bg-primary-500 hover:border-primary-500 hover:text-white active:bg-primary-600 active:border-primary-600 dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200 dark:hover:bg-primary-500 dark:hover:border-primary-500 dark:hover:text-white dark:active:bg-primary-600 dark:active:border-primary-600"
+      hx-post="/ai/rephrase-text"
+      hx-vals='js:{
+        text: document.getElementById("{{ id_slug }}-{{ control.id }}").value,
+        element_id: "{{ id_slug }}-{{ control.id }}",
+        element_name: "{{ name_attr }}",
+        placeholder: "{{ placeholder }}"
+      }'
+      hx-target="#textarea-wrapper-{{ id_slug }}-{{ control.id }}"  
+      hx-swap="innerHTML"
+      hx-indicator="#spinner-{{ id_slug }}-{{ control.id }}">
+      ✍️ Rephrase
+    </button>
+    <button
+      type="button"
+      class="text-sm font-medium rounded-none px-4 py-2 border transition-colors bg-secondary-200 border-secondary-300 text-secondary-700 hover:bg-primary-500 hover:border-primary-500 hover:text-white active:bg-primary-600 active:border-primary-600 dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200 dark:hover:bg-primary-500 dark:hover:border-primary-500 dark:hover:text-white dark:active:bg-primary-600 dark:active:border-primary-600"
+      hx-post="/ai/review-text"
+      hx-vals='js:{text: document.getElementById("{{ id_slug }}-{{ control.id }}").value}'
+      hx-target="#review-output-{{ id_slug }}-{{ control.id }}"
+      hx-swap="innerHTML"
+      hx-indicator="#spinner-{{ id_slug }}-{{ control.id }}">
+      🔍 Review
+    </button>
+    <span id="spinner-{{ id_slug }}-{{ control.id }}" class="htmx-indicator text-xs">Working...</span>
+  </div>
+  <div id="review-output-{{ id_slug }}-{{ control.id }}"></div>
+</div>
+{% endmacro %}
+
 
 <div class="mt-6 border-t border-secondary-200 dark:border-secondary-700 pt-4">
   <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-4">
     Control Assessment
   </h3>
-
+  
   <form>
-    <!-- Section 1: Control Operation -->
-    <div
-      class="pt-8 border-t border-secondary-200 dark:border-secondary-700 mt-8"
-    >
-      <label
-        for="control-op-{{ control.id }}"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >1. Control Operation</label
-      >
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-        Describe how the control operates on a day-to-day basis.
-      </p>
+    {{ assessment_section(
+        control,
+        number="1",
+        title="Control Operation",
+        id_slug="control-op",
+        name_attr="control_operation",
+        helper_text="Describe how the control operates on a day-to-day basis.",
+        placeholder="e.g., User access is reviewed on a quarterly basis by line managers..."
+    ) }}
 
-      <!-- CHANGE 1: Added a wrapper div -->
-      <div id="textarea-wrapper-op-{{ control.id }}">
-        <textarea
-          id="control-op-{{ control.id }}"
-          name="control_operation"
-          rows="4"
-          class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-          placeholder="e.g., User access is reviewed on a quarterly basis by line managers..."
-        ></textarea>
-      </div>
+    {{ assessment_section(
+        control,
+        number="2",
+        title="Design & Implementation Details",
+        id_slug="design-impl",
+        name_attr="design_implementation",
+        helper_text="Provide technical details about how the control is designed and implemented.",
+        placeholder="e.g., The control is enforced via a scheduled script (verify_access.py)..."
+    ) }}
 
-      <!-- Action Bar -->
-      <div class="mt-2 flex items-center space-x-3">
-        <!-- CHANGE 2 & 3: Updated hx-target and hx-swap -->
-        <button
-          type="button"
-          class="text-xs font-medium text-primary-600 hover:underline"
-          hx-post="/ai/rephrase-text"
-          hx-vals='js:{
-            text: document.getElementById("control-op-{{ control.id }}").value,
-            element_id: "control-op-{{ control.id }}",
-            element_name: "control_operation",
-            placeholder: "e.g., User access is reviewed on a quarterly basis by line managers..."
-          }'
-          hx-target="#textarea-wrapper-op-{{ control.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner-op-{{ control.id }}"
-        >
-          ✍️ Rephrase
-        </button>
-        <button
-          type="button"
-          class="text-xs font-medium text-primary-600 hover:underline"
-          hx-post="/ai/review-text"
-          hx-vals='js:{text: document.getElementById("control-op-{{ control.id }}").value}'
-          hx-target="#review-output-op-{{ control.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner-op-{{ control.id }}"
-        >
-          🔍 Review
-        </button>
-        <span id="spinner-op-{{ control.id }}" class="htmx-indicator text-xs"
-          >Working...</span
-        >
-      </div>
-      <div id="review-output-op-{{ control.id }}"></div>
-    </div>
-
-    <!-- Section 2: Design & Implementation Details -->
-    <div
-      class="pt-8 border-t border-secondary-200 dark:border-secondary-700 mt-8"
-    >
-      <label
-        for="design-impl-{{ control.id }}"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >2. Design & Implementation Details</label
-      >
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-        Provide technical details about how the control is designed and
-        implemented.
-      </p>
-
-      <!-- CHANGE 1: Added a wrapper div -->
-      <div id="textarea-wrapper-impl-{{ control.id }}">
-        <textarea
-          id="design-impl-{{ control.id }}"
-          name="design_implementation"
-          rows="4"
-          class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-          placeholder="e.g., The control is enforced via a scheduled script (verify_access.py)..."
-        ></textarea>
-      </div>
-
-      <!-- Action Bar -->
-      <div class="mt-2 flex items-center space-x-3">
-        <!-- CHANGE 2 & 3: Updated hx-target and hx-swap -->
-        <button
-          type="button"
-          class="text-xs font-medium text-primary-600 hover:underline"
-          hx-post="/ai/rephrase-text"
-          hx-vals='js:{
-            text: document.getElementById("design-impl-{{ control.id }}").value,
-            element_id: "design-impl-{{ control.id }}",
-            element_name: "design_implementation",
-            placeholder: "e.g., The control is enforced via a scheduled script (verify_access.py)..."
-          }'
-          hx-target="#textarea-wrapper-impl-{{ control.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner-impl-{{ control.id }}"
-        >
-          ✍️ Rephrase
-        </button>
-        <button
-          type="button"
-          class="text-xs font-medium text-primary-600 hover:underline"
-          hx-post="/ai/review-text"
-          hx-vals='js:{text: document.getElementById("design-impl-{{ control.id }}").value}'
-          hx-target="#review-output-impl-{{ control.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner-impl-{{ control.id }}"
-        >
-          🔍 Review
-        </button>
-        <span id="spinner-impl-{{ control.id }}" class="htmx-indicator text-xs"
-          >Working...</span
-        >
-      </div>
-      <div id="review-output-impl-{{ control.id }}"></div>
-    </div>
-
-    <!-- Section 3: Evidence Description -->
-    <div
-      class="pt-8 border-t border-secondary-200 dark:border-secondary-700 mt-8"
-    >
-      <label
-        for="evidence-desc-{{ control.id }}"
-        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >3. Evidence Description</label
-      >
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-        Describe the evidence you would provide to an auditor to prove this
-        control is effective.
-      </p>
-
-      <!-- CHANGE 1: Added a wrapper div -->
-      <div id="textarea-wrapper-desc-{{ control.id }}">
-        <textarea
-          id="evidence-desc-{{ control.id }}"
-          name="evidence_description"
-          rows="4"
-          class="mt-1 block w-full p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-          placeholder="e.g., Provide screenshots of the completed access review tickets from Jira..."
-        ></textarea>
-      </div>
-
-      <!-- Action Bar -->
-      <div class="mt-2 flex items-center space-x-3">
-        <!-- CHANGE 2 & 3: Updated hx-target and hx-swap -->
-        <button
-          type="button"
-          class="text-xs font-medium text-primary-600 hover:underline"
-          hx-post="/ai/rephrase-text"
-          hx-vals='js:{
-            text: document.getElementById("evidence-desc-{{ control.id }}").value,
-            element_id: "evidence-desc-{{ control.id }}",
-            element_name: "evidence_description",
-            placeholder: "e.g., Provide screenshots of the completed access review tickets from Jira..."
-          }'
-          hx-target="#textarea-wrapper-desc-{{ control.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner-desc-{{ control.id }}"
-        >
-          ✍️ Rephrase
-        </button>
-        <button
-          type="button"
-          class="text-xs font-medium text-primary-600 hover:underline"
-          hx-post="/ai/review-text"
-          hx-vals='js:{text: document.getElementById("evidence-desc-{{ control.id }}").value}'
-          hx-target="#review-output-desc-{{ control.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#spinner-desc-{{ control.id }}"
-        >
-          🔍 Review
-        </button>
-        <span id="spinner-desc-{{ control.id }}" class="htmx-indicator text-xs"
-          >Working...</span
-        >
-      </div>
-      <div id="review-output-desc-{{ control.id }}"></div>
-    </div>
+    {{ assessment_section(
+        control,
+        number="3",
+        title="Evidence Description",
+        id_slug="evidence-desc",
+        name_attr="evidence_description",
+        helper_text="Describe the evidence you would provide to an auditor to prove this control is effective.",
+        placeholder="e.g., Provide screenshots of the completed access review tickets from Jira..."
+    ) }}
   </form>
 </div>
 
