@@ -6,6 +6,10 @@ import csv
 from typing import List, Optional
 import time
 
+import vertexai
+from vertexai.generative_models import GenerativeModel
+from markdown_it import MarkdownIt
+
 from fastapi import FastAPI, Request, Form, HTTPException, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -19,6 +23,21 @@ app = FastAPI()
 DEMO_PASSCODE = os.getenv("DEMO_PASSCODE")
 SECRET_KEY = os.getenv("SECRET_KEY") 
 COOKIE_NAME = "demo_session"
+
+md = MarkdownIt()
+
+# Configure Gemini API
+PROJECT_ID = "aicontrol-8c59b" # Replace with your project ID
+LOCATION = "us-central1"
+MODEL_NAME = "gemini-2.5-flash" 
+
+try:
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
+    GEMINI_MODEL = GenerativeModel(MODEL_NAME)
+    print("Vertex AI and Gemini Model initialized successfully.")
+except Exception as e:
+    print(f"Error initializing Vertex AI: {e}. AI features will be disabled.")
+    GEMINI_MODEL = None
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -146,4 +165,82 @@ async def get_control(request: Request, control_id: str):
     # which in turn includes the new assessment_workspace.html partial.
     return templates.TemplateResponse("control_details.html", context)
 
-# --- END OF REVISED main.py ---
+@app.post("/ai/rephrase-text")
+async def rephrase_text(
+    request: Request,
+    text: str = Form(...),
+    element_id: str = Form(...),
+    element_name: str = Form(...),
+    placeholder: str = Form(...)
+):
+    """Takes user text and returns a complete, new textarea element with the rephrased text."""
+    if not GEMINI_MODEL:
+        rephrased_text = "AI model is not configured."
+    elif not text.strip():
+        rephrased_text = ""
+    else:
+        # NEW, MORE RESTRICTIVE PROMPT
+        prompt = f"""
+        You are a document editor. Your task is to rephrase the following text to make it sound more professional and concise for a GRC report.
+
+        **Instructions:**
+        1.  Return ONLY the rephrased text.
+        2.  Do NOT provide options, explanations, or any surrounding text.
+        3.  Do NOT use Markdown formatting.
+        4.  Your entire response must be the improved text and nothing else.
+
+        **TEXT TO REPHRASE:**
+        ---
+        {text}
+        ---
+        """
+        try:
+            response = GEMINI_MODEL.generate_content(prompt)
+            rephrased_text = response.text.strip()
+        except Exception as e:
+            rephrased_text = f"Error: Could not rephrase text. Details: {e}"
+
+    context = {
+        "request": request,
+        "rephrased_text": rephrased_text,
+        "element_id": element_id,
+        "element_name": element_name,
+        "placeholder": placeholder,
+    }
+    # Return the new textarea element by rendering the partial
+    return templates.TemplateResponse("partials/rephrased_textarea.html", context)
+
+@app.post("/ai/review-text", response_class=HTMLResponse)
+async def review_text(request: Request, text: str = Form(...)):
+    """Takes user text and returns critical questions from three GRC personas."""
+    if not GEMINI_MODEL:
+        return HTMLResponse("<p class='text-red-500'>AI model not configured.</p>")
+
+    prompt = f"""
+    You are a panel of three senior GRC experts reviewing a control assessment document.
+    Based *only* on the provided text, your task is to ask one potent, insightful question from each of your expert perspectives.
+
+    TEXT TO REVIEW:
+    ---
+    {text}
+    ---
+
+    YOUR TASK:
+    Provide exactly three questions, one for each persona. Present your response as a Markdown formatted list.
+
+    - **As a Risk Manager:** [Your question, focusing on risk mitigation effectiveness and impact]
+    - **As a Compliance Manager:** [Your question, focusing on adherence to policy, standards, or regulations]
+    - **As an Audit Manager:** [Your question, focusing on testability, evidence, and repeatability]
+    """
+    try:
+        response = GEMINI_MODEL.generate_content(prompt)
+        # Convert the Markdown list from Gemini into HTML
+        questions_html = md.render(response.text)
+        
+        # Render a partial template to wrap the questions in a nice card
+        return templates.TemplateResponse(
+            "partials/review_questions.html",
+            {"request": request, "questions_html": questions_html}
+        )
+    except Exception as e:
+        return HTMLResponse(content=f"<p class='text-red-500'>Error during AI processing: {e}</p>")
