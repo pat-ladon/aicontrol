@@ -1,5 +1,5 @@
-fastapi
-uvicorn
+fastapi[standard]
+uvicorn[standard]
 python-multipart
 jinja2
 pydantic
@@ -9,3 +9,4 @@ python-dotenv
 itsdangerous
 gunicorn
 google-generativeai
+
