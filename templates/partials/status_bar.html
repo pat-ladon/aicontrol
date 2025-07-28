@@ -12,6 +12,10 @@
 >
   <div class="text-gray-500 dark:text-gray-400">
     <span>{{ controls_count }} controls loaded.</span>
+      {% if best_practices_count and best_practices_count > 0 %}
+      <span class="text-gray-300 dark:text-gray-600">|</span>
+      <span>{{ best_practices_count }} best practices considered.</span>
+    {% endif %}
   </div>
   <div class="text-right text-gray-500 dark:text-gray-400">
     <!-- Display response time only if it's available and greater than 0 -->

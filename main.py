@@ -6,6 +6,7 @@ import csv
 from pathlib import Path
 from typing import List, Optional
 import time
+import logging
 
 import vertexai
 from vertexai.generative_models import GenerativeModel
@@ -17,6 +18,26 @@ from fastapi.responses import HTMLResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# --- logging configuration ---
+# Create a custom formatter
+log_formatter = logging.Formatter(
+    '%(asctime)s | %(funcName)s | %(message)s', 
+    datefmt='%Y-%m-%d %H:%M'
+)
+
+# Get the root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Remove any existing handlers to avoid duplicates
+root_logger.handlers.clear()
+
+# Create a new handler to print to console and apply the formatter
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+root_logger.addHandler(console_handler)
+# --- logging configuration ---
 
 # --- FastAPI App Setup ---
 load_dotenv()
@@ -108,14 +129,18 @@ def load_controls_from_csv():
 # Load data on startup
 load_controls_from_csv()
 
-# Load the central guidance document for grounding all prompts
-try:
-    CENTRAL_GUIDANCE = Path("central_guidance.md").read_text()
-    print("Loaded central_guidance.md successfully.")
-except FileNotFoundError:
-    print("Warning: central_guidance.md not found. AI responses will lack global context.")
-    CENTRAL_GUIDANCE = "" # Default to empty string if not found
-
+def load_best_practices(control_id: str) -> tuple[str, int]:
+    """Loads best practice content and counts the items for a specific control."""
+    try:
+        guidance_path = Path(f"guidance/{control_id}.md")
+        content = guidance_path.read_text()
+        # Count lines starting with '*' or '-' as a simple heuristic for number of practices
+        practice_count = sum(1 for line in content.splitlines() if line.strip().startswith(('*', '-')))
+        return content, practice_count
+    except FileNotFoundError:
+        # If no specific guidance exists, return empty values gracefully
+        return "", 0
+    
 # --- Helper Function to find a control ---
 def find_control_by_id(control_id: str) -> Optional[Control]:
     return next((c for c in controls if c.id == control_id), None)
@@ -163,12 +188,15 @@ async def get_control(request: Request, control_id: str):
     if not control:
         raise HTTPException(status_code=404, detail="Control not found")
     
+    _, best_practices_count = load_best_practices(control.id)
+
     response_time = time.time() - request.state.start_time
     context = {
         "request": request, 
         "control": control,
         "controls_count": len(controls),
-        "response_time": response_time
+        "response_time": response_time,
+        "best_practices_count": best_practices_count
     }
 
     # This endpoint now renders the simplified control_details.html,
@@ -189,6 +217,10 @@ async def rephrase_text(
     if not control:
         return HTMLResponse("Error: Control not found.", status_code=404)
     
+    
+    logging.info(f"Rephrasing text for control '{control_id}' in section '{element_name}'")
+    best_practices, best_practices_count = load_best_practices(control_id)
+
     """Takes user text and returns a complete, new textarea element with the rephrased text."""
     if not GEMINI_MODEL:
         rephrased_text = "AI model is not configured."
@@ -201,7 +233,7 @@ async def rephrase_text(
 
     **GLOBAL BEST PRACTICES FOR REFERENCE:**
     ---
-    {CENTRAL_GUIDANCE}
+    {best_practices}
     ---
 
     **CONTEXT OF THE SPECIFIC CONTROL YOU ARE WORKING ON:**
@@ -239,6 +271,7 @@ async def rephrase_text(
         "placeholder": placeholder,
         "controls_count": len(controls),
         "response_time": response_time,
+        "best_practices_count": best_practices_count
     }
 
     textarea_html = templates.get_template("partials/rephrased_textarea.html").render(context)
@@ -255,6 +288,8 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
     if not GEMINI_MODEL:
         return HTMLResponse("<p class='text-red-500'>AI model not configured.</p>")
     
+    best_practices, best_practices_count = load_best_practices(control_id)
+
     control = find_control_by_id(control_id)
     if not control:
         return HTMLResponse("Error: Control not found.", status_code=404)
@@ -265,7 +300,7 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
 
     **GLOBAL BEST PRACTICES FOR REFERENCE:**
     ---
-    {CENTRAL_GUIDANCE}
+    {best_practices}
     ---
 
     **CONTEXT OF THE SPECIFIC CONTROL YOU ARE WORKING ON:**
@@ -298,6 +333,7 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
             "questions_html": questions_html,
             "controls_count": len(controls),
             "response_time": response_time,
+            "best_practices_count": best_practices_count
         }
 
         # 3. Render both HTML snippets
@@ -309,5 +345,48 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
         
         return HTMLResponse(content=full_response)
     
+    except Exception as e:
+        return HTMLResponse(content=f"<p class='text-red-500'>Error during AI processing: {e}</p>")
+
+@app.post("/ai/chat", response_class=HTMLResponse)
+async def general_chat(request: Request, user_message: str = Form(...)):
+    """Handles general, non-control-specific chat requests."""
+    if not GEMINI_MODEL:
+        return HTMLResponse("<p class='text-red-500'>AI model not configured.</p>")
+
+
+    # Use the central guidance to keep the chat focused on GRC topics
+    prompt = f"""
+    You are a helpful and professional GRC (Governance, Risk, and Compliance) assistant.
+    Use the following best practices to inform your answers.
+
+    **BEST PRACTICES REFERENCE:**
+    ---
+    Assume GRC standards provide best practices.
+    ---
+
+    **USER'S QUESTION:**
+    {user_message}
+    """
+    
+    try:
+        response = GEMINI_MODEL.generate_content(prompt)
+        ai_response_html = md.render(response.text)
+
+        # --- OOB Swap Logic ---
+        response_time = time.time() - request.state.start_time
+        context = {
+            "request": request,
+            "user_message": user_message,
+            "ai_response_html": ai_response_html,
+            "controls_count": len(controls),
+            "response_time": response_time,
+        }
+        
+        chat_pair_html = templates.get_template("partials/chat_message_pair.html").render(context)
+        status_bar_html = templates.get_template("partials/status_bar.html").render(context)
+        
+        return HTMLResponse(content=chat_pair_html + status_bar_html)
+
     except Exception as e:
         return HTMLResponse(content=f"<p class='text-red-500'>Error during AI processing: {e}</p>")
