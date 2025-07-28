@@ -46,6 +46,7 @@ module.exports = {
         800: "#1f2937",
       },
       red: { 600: "#DC2626" },
+      black: '#000000',
     },
     // The 'extend' block is now used for non-color extensions if needed.
     extend: {

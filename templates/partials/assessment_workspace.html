@@ -14,13 +14,20 @@
     <!-- CHANGE: Replaced the entire class attribute with new styles -->
     <button
       type="button"
-      class="text-sm font-medium rounded-none px-4 py-2 border transition-colors bg-secondary-200 border-secondary-300 text-secondary-700 hover:bg-primary-500 hover:border-primary-500 hover:text-white active:bg-primary-600 active:border-primary-600 dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200 dark:hover:bg-primary-500 dark:hover:border-primary-500 dark:hover:text-white dark:active:bg-primary-600 dark:active:border-primary-600"
+      class="text-sm font-medium rounded-none px-4 py-2 border transition-colors 
+       bg-secondary-200 border-secondary-300 text-black
+       hover:bg-primary-500 hover:border-primary-500 hover:text-white
+       active:bg-primary-600 active:border-primary-600
+       dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200
+       dark:hover:bg-secondary-200 dark:hover:border-secondary-200 dark:hover:text-black
+       dark:active:bg-primary-600 dark:active:border-primary-600"
       hx-post="/ai/rephrase-text"
       hx-vals='js:{
         text: document.getElementById("{{ id_slug }}-{{ control.id }}").value,
         element_id: "{{ id_slug }}-{{ control.id }}",
         element_name: "{{ name_attr }}",
-        placeholder: "{{ placeholder }}"
+        placeholder: "{{ placeholder }}",
+        control_id: "{{ control.id }}"
       }'
       hx-target="#textarea-wrapper-{{ id_slug }}-{{ control.id }}"  
       hx-swap="innerHTML"
@@ -29,9 +36,15 @@
     </button>
     <button
       type="button"
-      class="text-sm font-medium rounded-none px-4 py-2 border transition-colors bg-secondary-200 border-secondary-300 text-secondary-700 hover:bg-primary-500 hover:border-primary-500 hover:text-white active:bg-primary-600 active:border-primary-600 dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200 dark:hover:bg-primary-500 dark:hover:border-primary-500 dark:hover:text-white dark:active:bg-primary-600 dark:active:border-primary-600"
+      class="text-sm font-medium rounded-none px-4 py-2 border transition-colors 
+       bg-secondary-200 border-secondary-300 text-black
+       hover:bg-primary-500 hover:border-primary-500 hover:text-white
+       active:bg-primary-600 active:border-primary-600
+       dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200
+       dark:hover:text-black dark:hover:bg-secondary-200 dark:hover:border-secondary-200 
+       dark:active:bg-primary-600 dark:active:border-primary-600"
       hx-post="/ai/review-text"
-      hx-vals='js:{text: document.getElementById("{{ id_slug }}-{{ control.id }}").value}'
+      hx-vals='js:{text: document.getElementById("{{ id_slug }}-{{ control.id }}").value, control_id: "{{ control.id }}"}''
       hx-target="#review-output-{{ id_slug }}-{{ control.id }}"
       hx-swap="innerHTML"
       hx-indicator="#spinner-{{ id_slug }}-{{ control.id }}">

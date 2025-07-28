@@ -3,6 +3,7 @@
 import os
 from dotenv import load_dotenv
 import csv
+from pathlib import Path
 from typing import List, Optional
 import time
 
@@ -103,8 +104,17 @@ def load_controls_from_csv():
     except FileNotFoundError:
         print("Error: controls.csv not found. No controls will be loaded.")
 
+
 # Load data on startup
 load_controls_from_csv()
+
+# Load the central guidance document for grounding all prompts
+try:
+    CENTRAL_GUIDANCE = Path("central_guidance.md").read_text()
+    print("Loaded central_guidance.md successfully.")
+except FileNotFoundError:
+    print("Warning: central_guidance.md not found. AI responses will lack global context.")
+    CENTRAL_GUIDANCE = "" # Default to empty string if not found
 
 # --- Helper Function to find a control ---
 def find_control_by_id(control_id: str) -> Optional[Control]:
@@ -169,10 +179,16 @@ async def get_control(request: Request, control_id: str):
 async def rephrase_text(
     request: Request,
     text: str = Form(...),
+    control_id: str = Form(...),
     element_id: str = Form(...),
     element_name: str = Form(...),
     placeholder: str = Form(...)
 ):
+    """Rephrases text with full context awareness."""
+    control = find_control_by_id(control_id)
+    if not control:
+        return HTMLResponse("Error: Control not found.", status_code=404)
+    
     """Takes user text and returns a complete, new textarea element with the rephrased text."""
     if not GEMINI_MODEL:
         rephrased_text = "AI model is not configured."
@@ -181,24 +197,39 @@ async def rephrase_text(
     else:
         # NEW, MORE RESTRICTIVE PROMPT
         prompt = f"""
-        You are a document editor. Your task is to rephrase the following text to make it sound more professional and concise for a GRC report.
+        You are a GRC writing assistant. Your task is to rewrite the user's input text to make it sound more professional and concise.
 
-        **Instructions:**
-        1.  Return ONLY the rephrased text.
-        2.  Do NOT provide options, explanations, or any surrounding text.
-        3.  Do NOT use Markdown formatting.
-        4.  Your entire response must be the improved text and nothing else.
+    **GLOBAL BEST PRACTICES FOR REFERENCE:**
+    ---
+    {CENTRAL_GUIDANCE}
+    ---
 
-        **TEXT TO REPHRASE:**
-        ---
-        {text}
-        ---
-        """
+    **CONTEXT OF THE SPECIFIC CONTROL YOU ARE WORKING ON:**
+    - Risk Description: "{control.risk_text}"
+    - Overall Control Description: "{control.control_text}"
+
+    **USER'S TEXT TO REPHRASE:**
+    ---
+    {text}
+    ---
+
+    **YOUR TASK:**
+    Rewrite the "USER'S TEXT TO REPHRASE" using the provided context. 
+        
+    **Instructions:**
+    1.  Return ONLY the rephrased text.
+    2.  Do NOT provide options, explanations, or any surrounding text.
+    3.  Do NOT use Markdown formatting.
+    4.  Your entire response must be the improved text and nothing else.
+    """
+
         try:
             response = GEMINI_MODEL.generate_content(prompt)
             rephrased_text = response.text.strip()
         except Exception as e:
             rephrased_text = f"Error: Could not rephrase text. Details: {e}"
+
+    response_time = time.time() - request.state.start_time
 
     context = {
         "request": request,
@@ -206,27 +237,48 @@ async def rephrase_text(
         "element_id": element_id,
         "element_name": element_name,
         "placeholder": placeholder,
+        "controls_count": len(controls),
+        "response_time": response_time,
     }
-    # Return the new textarea element by rendering the partial
-    return templates.TemplateResponse("partials/rephrased_textarea.html", context)
+
+    textarea_html = templates.get_template("partials/rephrased_textarea.html").render(context)
+    status_bar_html = templates.get_template("partials/status_bar.html").render(context)
+    # Combine the snippets into a single response payload
+    full_response = textarea_html + status_bar_html
+    
+    return HTMLResponse(content=full_response)# Return the new textarea element by rendering the partial
+    # return templates.TemplateResponse("partials/rephrased_textarea.html", context)
 
 @app.post("/ai/review-text", response_class=HTMLResponse)
-async def review_text(request: Request, text: str = Form(...)):
+async def review_text(request: Request, text: str = Form(...), control_id: str = Form(...)):
     """Takes user text and returns critical questions from three GRC personas."""
     if not GEMINI_MODEL:
         return HTMLResponse("<p class='text-red-500'>AI model not configured.</p>")
-
+    
+    control = find_control_by_id(control_id)
+    if not control:
+        return HTMLResponse("Error: Control not found.", status_code=404)
+    
+    # CONTEXT-AWARE PROMPT
     prompt = f"""
-    You are a panel of three senior GRC experts reviewing a control assessment document.
-    Based *only* on the provided text, your task is to ask one potent, insightful question from each of your expert perspectives.
+    You are a panel of three senior GRC experts reviewing a specific piece of a control assessment.
 
-    TEXT TO REVIEW:
+    **GLOBAL BEST PRACTICES FOR REFERENCE:**
+    ---
+    {CENTRAL_GUIDANCE}
+    ---
+
+    **CONTEXT OF THE SPECIFIC CONTROL YOU ARE WORKING ON:**
+    - Risk Description: "{control.risk_text}"
+    - Overall Control Description: "{control.control_text}"
+
+    **SPECIFIC TEXT SNIPPET TO REVIEW:**
     ---
     {text}
     ---
 
     YOUR TASK:
-    Provide exactly three questions, one for each persona. Present your response as a Markdown formatted list.
+    Based on all the provided context, ask one potent, insightful question from each of your expert perspectives that challenges the "SPECIFIC TEXT SNIPPET TO REVIEW". Present your response as a Markdown formatted list.
 
     - **As a Risk Manager:** [Your question, focusing on risk mitigation effectiveness and impact]
     - **As a Compliance Manager:** [Your question, focusing on adherence to policy, standards, or regulations]
@@ -237,10 +289,25 @@ async def review_text(request: Request, text: str = Form(...)):
         # Convert the Markdown list from Gemini into HTML
         questions_html = md.render(response.text)
         
-        # Render a partial template to wrap the questions in a nice card
-        return templates.TemplateResponse(
-            "partials/review_questions.html",
-            {"request": request, "questions_html": questions_html}
-        )
+       # 1. Calculate the response time
+        response_time = time.time() - request.state.start_time
+
+        # 2. Prepare a context dictionary for ALL templates
+        context = {
+            "request": request,
+            "questions_html": questions_html,
+            "controls_count": len(controls),
+            "response_time": response_time,
+        }
+
+        # 3. Render both HTML snippets
+        review_card_html = templates.get_template("partials/review_questions.html").render(context)
+        status_bar_html = templates.get_template("partials/status_bar.html").render(context)
+
+        # 4. Combine the snippets into a single response payload
+        full_response = review_card_html + status_bar_html
+        
+        return HTMLResponse(content=full_response)
+    
     except Exception as e:
         return HTMLResponse(content=f"<p class='text-red-500'>Error during AI processing: {e}</p>")
