@@ -94,11 +94,12 @@ The co-pilot's core value comes from its context-aware AI tools, which are avail
 
 1.  Authenticate `gcloud`: `gcloud auth login` and set your project.
 2.  Ensure you have a `Dockerfile` in your project root.
-3.  Deploy using the `gcloud run deploy` command, providing environment variables:
+3.  Generate a `YOUR_SECRET_KEY` with `openssl rand -hex 32`
+4.  Deploy using the `gcloud run deploy` command, providing environment variables:
     ```bash
     gcloud run deploy gcr-copilot \
       --source . \
       --region us-central1 \
       --allow-unauthenticated \
-      --set-env-vars="DEMO_PASSCODE=YOUR_DEMO_PASSCODE,SECRET_KEY=YOUR_SECRET_KEY"
+      --set-env-vars="SECRET_KEY=YOUR_SECRET_KEY"
     ```
