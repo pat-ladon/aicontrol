@@ -1,12 +1,14 @@
-<!-- START: app/templates/partials/control_admin_edit_section_row.html -->
-{% set current_index = loop.index0 if loop else index %}
+<!-- START: app/templates/partials/control_admin_edit_section_row.html (with index fix) -->
+{# This template now uses a single, reliable way to get the index, preventing
+field names from being generated without a number. #} {% set current_index =
+index if index is defined else loop.index0 %}
+
 <div
   class="grid grid-cols-1 md:grid-cols-5 gap-2 p-2 bg-white dark:bg-secondary-800 rounded-none border group relative"
 >
-  <!-- Hidden input for existing sections, not present for new ones -->
   <input
     type="hidden"
-    name="section_id_slug_{{ current_index  }}"
+    name="section_id_slug_{{ current_index }}"
     value="{{ section.id_slug if section else '' }}"
   />
 
@@ -19,26 +21,25 @@
   />
   <input
     type="text"
-    name="section_helper_text_{{ current_index  }}"
+    name="section_helper_text_{{ current_index }}"
     value="{{ section.helper_text if section else '' }}"
     placeholder="Helper Text"
     class="w-full p-1 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
   />
   <input
     type="text"
-    name="section_placeholder_{{ current_index  }}"
+    name="section_placeholder_{{ current_index }}"
     value="{{ section.placeholder if section else '' }}"
     placeholder="Placeholder"
-    class="md:col-span-2 w-full p-1 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+    class="w-full p-1 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
   />
 
-  <!-- Delete Button - appears on hover -->
   <div
     class="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity"
   >
     <button
       type="button"
-      class="h-6 w-6 bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-md hover:bg-red-700"
+      class="h-6 w-6 bg-red-600 ..."
       _="on click remove closest .grid"
       title="Delete Section"
     >

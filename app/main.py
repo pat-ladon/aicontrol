@@ -11,6 +11,7 @@ import logging
 import secrets
 from datetime import datetime
 import uuid
+import copy
 
 import vertexai
 from vertexai.generative_models import GenerativeModel
@@ -779,6 +780,9 @@ async def get_control_row(request: Request, control_id: str):
     )
 
 
+# In app/main.py
+
+
 @app.put("/admin/controls/update/{control_id}", response_class=HTMLResponse)
 async def update_control(request: Request, control_id: str):
     """Handles the update of an existing control's data."""
@@ -792,21 +796,30 @@ async def update_control(request: Request, control_id: str):
 
     form_data = await request.form()
 
-    # Update main attributes
+    # Update main attributes (This part is correct)
     control_to_update.name = form_data.get("name")
     control_to_update.risk_id = form_data.get("risk_id")
     control_to_update.owner = form_data.get("owner")
     control_to_update.risk_text = form_data.get("risk_text")
     control_to_update.description = form_data.get("description")
 
-    # Reconstruct the sections list from the indexed form data
+    # Reconstruct the sections list from the form (This part is correct)
     new_sections = []
     i = 0
     while True:
-        if f"section_id_slug_{i}" in form_data:
+        if f"section_title_{i}" in form_data:
+            id_slug = form_data.get(f"section_id_slug_{i}")
+            if not id_slug:
+                title = form_data.get(f"section_title_{i}", "")
+                slug_base = (
+                    "".join(c for c in title.lower() if c.isalnum() or c == " ")
+                    .strip()
+                    .replace(" ", "-")
+                )
+                id_slug = f"new-{slug_base}-{i}"
             new_sections.append(
                 Section(
-                    id_slug=form_data.get(f"section_id_slug_{i}"),
+                    id_slug=id_slug,
                     title=form_data.get(f"section_title_{i}"),
                     helper_text=form_data.get(f"section_helper_text_{i}"),
                     placeholder=form_data.get(f"section_placeholder_{i}"),
@@ -819,18 +832,23 @@ async def update_control(request: Request, control_id: str):
 
     # --- Rewrite the entire CSV file to persist the changes ---
     csv_path = Path(__file__).parent / "controls.csv"
-    current_controls_dict = [c.model_dump() for c in controls]
 
-    with open(csv_path, mode="w", newline="", encoding="utf-8") as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=Control.model_fields.keys())
-        writer.writeheader()
-        for control_dict in current_controls_dict:
-            control_dict["sections"] = json.dumps(control_dict["sections"])
-            writer.writerow(control_dict)
+    controls_for_csv = copy.deepcopy(controls)
+    list_to_write = [c.model_dump() for c in controls_for_csv]
+
+    try:
+        with open(csv_path, mode="w", newline="", encoding="utf-8") as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=Control.model_fields.keys())
+            writer.writeheader()
+            for control_dict in list_to_write:
+                # 'sections' is already a list of dicts here from model_dump()
+                control_dict["sections"] = json.dumps(control_dict["sections"])
+                writer.writerow(control_dict)
+    except Exception as e:
+        logging.error(f"Failed to rewrite controls.csv: {e}")
 
     logging.info(f"Admin '{user.username}' updated control '{control_to_update.name}'")
 
-    # Return the updated read-only row to swap back into the table
     return templates.TemplateResponse(
         "partials/control_admin_row.html",
         {"request": request, "control_to_display": control_to_update},
