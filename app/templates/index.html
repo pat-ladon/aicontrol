@@ -8,6 +8,7 @@
     <title>Open GRC</title>
     <link href="/static/styles.css" rel="stylesheet" />
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
     <script src="/static/theme.js"></script>
   </head>
   <body
@@ -44,6 +45,9 @@
                 <a
                   href="/admin/controls"
                   class="block px-4 py-2 text-sm text-neutral-900 dark:text-neutral-100 hover:bg-secondary-200 dark:hover:bg-secondary-700"
+                  hx-get="/admin/controls"
+                  hx-target="#main-content"
+                  hx-swap="innerHTML"
                   >Manage Controls</a
                 >
               </div>

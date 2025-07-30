@@ -10,6 +10,7 @@ import time
 import logging
 import secrets
 from datetime import datetime
+import uuid
 
 import vertexai
 from vertexai.generative_models import GenerativeModel
@@ -630,7 +631,221 @@ async def delete_user(request: Request, token: str):
 # --- NEW: Placeholder for Manage Controls ---
 @app.get("/admin/controls", response_class=HTMLResponse)
 async def manage_controls_page(request: Request):
+    """Serves the control management page as a workspace fragment."""
     user = getattr(request.state, "user", None)
     if not user or user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access Forbidden")
-    return HTMLResponse("<h1>Manage Controls (Coming Soon)</h1>")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    response_time = time.time() - request.state.start_time
+    context = {
+        "request": request,
+        "user": user,
+        "all_controls": controls,  # Pass the full list of controls
+        "controls_count": len(controls),
+        "response_time": response_time,
+    }
+
+    controls_page_html = templates.get_template("admin/controls.html").render(context)
+    status_bar_html = templates.get_template("partials/status_bar.html").render(context)
+
+    return HTMLResponse(content=controls_page_html + status_bar_html)
+
+
+@app.post("/admin/controls/add", response_class=HTMLResponse)
+async def add_control(
+    request: Request,
+    name: str = Form(...),
+    risk_id: str = Form(...),
+    owner: str = Form(...),
+    risk_text: str = Form(...),
+    description: str = Form(...),
+):
+    """Handles the creation of a new control."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # 1. Generate new control data
+    new_id = str(uuid.uuid4())  # Generate a unique ID for the new control
+    new_control = Control(
+        id=new_id,
+        name=name,
+        risk_id=risk_id,
+        status="Active",
+        owner=owner,
+        risk_text=risk_text,
+        description=description,
+        sections=[],  # New controls start with empty sections
+    )
+
+    # 2. Append to the CSV file
+    csv_path = Path(__file__).parent / "controls.csv"
+    try:
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as outfile:
+            writer = csv.writer(outfile)
+            # Match the order of your CSV headers
+            writer.writerow(
+                [
+                    new_control.id,
+                    new_control.name,
+                    new_control.risk_id,
+                    new_control.status,
+                    new_control.owner,
+                    new_control.risk_text,
+                    new_control.description,
+                    "[]",
+                ]
+            )
+    except Exception as e:
+        logging.error(f"Failed to write new control to controls.csv: {e}")
+        raise HTTPException(status_code=500, detail="Could not save new control.")
+
+    # 3. Add to the in-memory list
+    controls.append(new_control)
+    logging.info(f"Admin '{user.username}' created new control '{new_control.name}'")
+
+    # 4. Return an HTML fragment of the new control row for HTMX
+    return templates.TemplateResponse(
+        "partials/control_admin_row.html",
+        {"request": request, "control_to_display": new_control},
+    )
+
+
+@app.delete("/admin/controls/delete/{control_id}", status_code=200)
+async def delete_control(request: Request, control_id: str):
+    """Handles the deletion of a control."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    control_to_delete = find_control_by_id(control_id)
+    if not control_to_delete:
+        raise HTTPException(status_code=404, detail="Control not found")
+
+    # 1. Remove from in-memory list
+    controls.remove(control_to_delete)
+    logging.info(
+        f"Admin '{user.username}' deleted control '{control_to_delete.name}' (ID: {control_id})"
+    )
+
+    # 2. Rewrite the CSV file without the deleted control
+    csv_path = Path(__file__).parent / "controls.csv"
+    current_controls_dict = [c.model_dump() for c in controls]
+
+    with open(csv_path, mode="w", newline="", encoding="utf-8") as outfile:
+        # Important: Get the fieldnames from the Pydantic model to ensure order
+        writer = csv.DictWriter(outfile, fieldnames=Control.model_fields.keys())
+        writer.writeheader()
+        for control_dict in current_controls_dict:
+            # Convert the 'sections' list back to a JSON string for CSV storage
+            control_dict["sections"] = json.dumps(control_dict["sections"])
+            writer.writerow(control_dict)
+
+    # 3. Return an empty 200 OK response for HTMX
+    return Response(status_code=200)
+
+
+@app.get("/admin/controls/edit/{control_id}", response_class=HTMLResponse)
+async def get_control_edit_form(request: Request, control_id: str):
+    """Returns an HTML fragment of the edit form for a specific control."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    control_to_edit = find_control_by_id(control_id)
+    if not control_to_edit:
+        raise HTTPException(status_code=404, detail="Control not found")
+
+    return templates.TemplateResponse(
+        "partials/control_admin_edit_form.html",
+        {"request": request, "control_to_edit": control_to_edit},
+    )
+
+
+@app.get("/admin/controls/row/{control_id}", response_class=HTMLResponse)
+async def get_control_row(request: Request, control_id: str):
+    """Returns an HTML fragment of a single read-only control row."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    control_to_display = find_control_by_id(control_id)
+    if not control_to_display:
+        return HTMLResponse("<tr><td colspan='3'>Error: Control not found.</td></tr>")
+
+    return templates.TemplateResponse(
+        "partials/control_admin_row.html",
+        {"request": request, "control_to_display": control_to_display},
+    )
+
+
+@app.put("/admin/controls/update/{control_id}", response_class=HTMLResponse)
+async def update_control(request: Request, control_id: str):
+    """Handles the update of an existing control's data."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    control_to_update = find_control_by_id(control_id)
+    if not control_to_update:
+        raise HTTPException(status_code=404, detail="Control not found")
+
+    form_data = await request.form()
+
+    # Update main attributes
+    control_to_update.name = form_data.get("name")
+    control_to_update.risk_id = form_data.get("risk_id")
+    control_to_update.owner = form_data.get("owner")
+    control_to_update.risk_text = form_data.get("risk_text")
+    control_to_update.description = form_data.get("description")
+
+    # Reconstruct the sections list from the indexed form data
+    new_sections = []
+    i = 0
+    while True:
+        if f"section_id_slug_{i}" in form_data:
+            new_sections.append(
+                Section(
+                    id_slug=form_data.get(f"section_id_slug_{i}"),
+                    title=form_data.get(f"section_title_{i}"),
+                    helper_text=form_data.get(f"section_helper_text_{i}"),
+                    placeholder=form_data.get(f"section_placeholder_{i}"),
+                )
+            )
+            i += 1
+        else:
+            break
+    control_to_update.sections = new_sections
+
+    # --- Rewrite the entire CSV file to persist the changes ---
+    csv_path = Path(__file__).parent / "controls.csv"
+    current_controls_dict = [c.model_dump() for c in controls]
+
+    with open(csv_path, mode="w", newline="", encoding="utf-8") as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=Control.model_fields.keys())
+        writer.writeheader()
+        for control_dict in current_controls_dict:
+            control_dict["sections"] = json.dumps(control_dict["sections"])
+            writer.writerow(control_dict)
+
+    logging.info(f"Admin '{user.username}' updated control '{control_to_update.name}'")
+
+    # Return the updated read-only row to swap back into the table
+    return templates.TemplateResponse(
+        "partials/control_admin_row.html",
+        {"request": request, "control_to_display": control_to_update},
+    )
+
+
+@app.get("/admin/controls/sections/new", response_class=HTMLResponse)
+async def get_new_section_row(request: Request, index: int):
+    """Returns an HTML fragment for a new, blank workspace section row."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # We pass the 'index' to ensure the form field names are unique
+    return templates.TemplateResponse(
+        "partials/control_admin_edit_section_row.html",
+        {"request": request, "section": None, "loop": {"index0": index}},
+    )

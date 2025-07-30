@@ -1,0 +1,115 @@
+<!-- START: app/templates/partials/control_admin_edit_form.html -->
+<tr hx-indicator="this">
+  <td colspan="3" class="p-0">
+    <form
+      hx-put="/admin/controls/update/{{ control_to_edit.id }}"
+      hx-target="closest tr"
+      hx-swap="outerHTML"
+    >
+      <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 space-y-4">
+        <h4 class="font-bold">Editing: {{ control_to_edit.name }}</h4>
+
+        <!-- Main Fields -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-medium">Name</label>
+            <input
+              type="text"
+              name="name"
+              value="{{ control_to_edit.name }}"
+              required
+              class="mt-1 w-full p-2 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium">Risk ID</label>
+            <input
+              type="text"
+              name="risk_id"
+              value="{{ control_to_edit.risk_id or '' }}"
+              class="mt-1 w-full p-2 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium">Owner</label>
+            <input
+              type="text"
+              name="owner"
+              value="{{ control_to_edit.owner or '' }}"
+              class="mt-1 w-full p-2 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            />
+          </div>
+          <div class="md:col-span-3">
+            <label class="block text-xs font-medium">Risk Description</label>
+            <textarea
+              name="risk_text"
+              rows="2"
+              class="mt-1 w-full p-2 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            >
+{{ control_to_edit.risk_text or '' }}</textarea
+            >
+          </div>
+          <div class="md:col-span-3">
+            <label class="block text-xs font-medium">Control Description</label>
+            <textarea
+              name="description"
+              rows="3"
+              required
+              class="mt-1 w-full p-2 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            >
+{{ control_to_edit.description }}</textarea
+            >
+          </div>
+        </div>
+
+        <!-- Sections Editor -->
+        <div class="pt-4 border-t border-yellow-200 dark:border-yellow-900/50">
+          <div class="flex justify-between items-center mb-2">
+            <h5 class="font-semibold">Workspace Sections</h5>
+          </div>
+
+          <div id="sections-container" class="space-y-3">
+            <!-- CHANGE 1: Use a loop to include the new partial -->
+            {% for section in control_to_edit.sections %} {% include
+            'partials/control_admin_edit_section_row.html' %} {% endfor %}
+          </div>
+
+          <!-- CHANGE 2: Add the "Add New Section" button -->
+          <div class="mt-3">
+            <button
+              type="button"
+              class="text-xs font-medium text-primary-600 hover:underline"
+              hx-get="/admin/controls/sections/new"
+              hx-vals='js:{index: document.querySelectorAll("#sections-container > div").length}'
+              hx-target="#sections-container"
+              hx-swap="beforeend"
+            >
+              + Add Section
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-end items-center space-x-3 pt-4">
+          <button
+            type="button"
+            class="text-sm font-medium rounded-none px-4 py-2 border rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            hx-get="/admin/controls/row/{{ control_to_edit.id }}"
+            hx-target="closest tr"
+            hx-swap="outerHTML"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="text-sm font-medium rounded-none px-4 py-2 border bg-primary-600 text-white ..."
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </form>
+  </td>
+</tr>
+<!-- NOTE: I have truncated long class lists for brevity -->
+<!-- END: app/templates/partials/control_admin_edit_form.html -->

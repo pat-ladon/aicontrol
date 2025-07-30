@@ -1,0 +1,33 @@
+<!-- START: app/templates/partials/control_admin_row.html -->
+<tr class="transition-opacity duration-500">
+  <td class="py-2 px-4 whitespace-nowrap font-semibold">
+    {{ control_to_display.name }}
+  </td>
+  <td class="py-2 px-4 text-sm text-gray-500 dark:text-gray-400">
+    {{ control_to_display.description[:60] }}{% if
+    control_to_display.description|length > 60 %}...{% endif %}
+  </td>
+  <td class="py-2 px-4 whitespace-nowrap text-sm flex items-center space-x-4">
+    <!-- CHANGE 1: Added an Edit button -->
+    <button
+      type="button"
+      class="text-xs font-medium text-blue-600 hover:underline"
+      hx-get="/admin/controls/edit/{{ control_to_display.id }}"
+      hx-target="closest tr"
+      hx-swap="outerHTML"
+    >
+      Edit
+    </button>
+    <button
+      type="button"
+      class="text-xs font-medium text-red-600 hover:underline"
+      hx-delete="/admin/controls/delete/{{ control_to_display.id }}"
+      hx-target="closest tr"
+      hx-swap="outerHTML swap:500ms"
+      hx-confirm="Are you sure you want to delete the control '{{ control_to_display.name }}'?"
+    >
+      Delete
+    </button>
+  </td>
+</tr>
+<!-- END: app/templates/partials/control_admin_row.html -->
