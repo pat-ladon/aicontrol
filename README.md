@@ -41,7 +41,7 @@ The co-pilot's core value comes from its context-aware AI tools, which are avail
 -   **User Story:** "My draft notes are rough. I want a one-click way to transform them into professional, audit-ready language."
 -   **Functionality:** Each `textarea` is accompanied by a **"✍️ Rephrase"** button.
 -   **Contextual Grounding:** When clicked, the user's text is sent to the AI along with two layers of context:
-    1.  **Control-Specific Context:** The `risk_text` and `control_text` for the selected control.
+    1.  **Control-Specific Context:** The `name` and `description` for the selected control.
     2.  **Best-Practice Context:** Specific guidance loaded from the `guidance/{control_id}.md` file.
 -   **Output:** The AI returns a single, professionally rephrased sentence or paragraph, which instantly replaces the user's original text in the `textarea`.
 

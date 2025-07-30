@@ -20,7 +20,11 @@
       >
         <div class="px-2 flex justify-between items-center">
           <h1 class="text-2xl font-bold">Open GRC</h1>
-          <div class="space-x-4">
+          <div class="flex items-center space-x-4">
+            <!-- NEW: Display the username if they are logged in -->
+            {% if username %}
+              <span class="text-sm">Welcome, {{ username }}</span>
+            {% endif %}
             <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
           </div>
         </div>

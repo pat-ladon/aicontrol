@@ -1,10 +1,11 @@
 # --- START OF REVISED main.py (for v0.1 - Step 1) ---
 
 import os
+import json
 from dotenv import load_dotenv
 import csv
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 import time
 import logging
 
@@ -22,8 +23,7 @@ from pydantic import BaseModel
 # --- logging configuration ---
 # Create a custom formatter
 log_formatter = logging.Formatter(
-    '%(asctime)s | %(funcName)s | %(message)s', 
-    datefmt='%Y-%m-%d %H:%M'
+    "%(asctime)s | %(funcName)s | %(message)s", datefmt="%Y-%m-%d %H:%M"
 )
 
 # Get the root logger
@@ -42,16 +42,15 @@ root_logger.addHandler(console_handler)
 # --- FastAPI App Setup ---
 load_dotenv()
 app = FastAPI()
-DEMO_PASSCODE = os.getenv("DEMO_PASSCODE")
-SECRET_KEY = os.getenv("SECRET_KEY") 
-COOKIE_NAME = "demo_session"
+SECRET_KEY = os.getenv("SECRET_KEY")
+COOKIE_NAME = "auth_token_session"
 
 md = MarkdownIt()
 
 # Configure Gemini API
-PROJECT_ID = "aicontrol-8c59b" # Replace with your project ID
+PROJECT_ID = "aicontrol-8c59b"  # Replace with your project ID
 LOCATION = "us-central1"
-MODEL_NAME = "gemini-2.5-flash" 
+MODEL_NAME = "gemini-2.5-flash"
 
 try:
     vertexai.init(project=PROJECT_ID, location=LOCATION)
@@ -64,62 +63,67 @@ except Exception as e:
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- Middleware for Authentication ---
-# This part is fine to keep as it controls access to the app.
-class AuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if request.url.path in ["/login", "/favicon.ico"] or request.url.path.startswith("/static"):
-            return await call_next(request)
 
-        passcode_in_cookie = request.cookies.get(COOKIE_NAME)
-        if passcode_in_cookie and passcode_in_cookie == DEMO_PASSCODE:
-            return await call_next(request)
+# --- Pydantic model for a user ---
 
-        return templates.TemplateResponse("login_dialog.html", {"request": request, "error": None})
-    
-class TimingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        request.state.start_time = time.time()
-        response = await call_next(request)
-        return response
-    
-app.add_middleware(AuthMiddleware)
-app.add_middleware(TimingMiddleware)
-
-
-# --- Login Endpoint ---
-@app.post("/login")
-async def login(request: Request, passcode: str = Form(...)):
-    if passcode == DEMO_PASSCODE:
-        response = Response(headers={"HX-Refresh": "true"})
-        response.set_cookie(key=COOKIE_NAME, value=passcode, httponly=True, max_age=86400)
-        return response
-    else:
-        return templates.TemplateResponse(
-            "login_dialog.html",
-            {"request": request, "error": "Invalid passcode. Please try again."}
-        )
 
 # --- Data Model & Loading ---
+class User(BaseModel):
+    username: str
+    token: str
+
+
+class Section(BaseModel):
+    id_slug: str
+    title: str
+    helper_text: str
+    placeholder: str
+
+
 class Control(BaseModel):
     id: str
     name: str
-    risk_id: str
-    status: str
-    owner: str
-    risk_text: str
-    control_text: str
+    risk_id: Optional[str] = None
+    status: Optional[str] = None
+    owner: Optional[str] = None
+    risk_text: Optional[str] = None
+    description: str
+    sections: List[Section]
     # Removed AI-related fields like 'suggestions' and 'assessment_document' for now
+
 
 controls: List[Control] = []
 
-def load_controls_from_csv():
-    """Loads control data from controls.csv into the in-memory list."""
+# --- Dictionary to hold users for fast lookups ---
+users_by_token: Dict[str, User] = {}
+
+
+def load_users_from_csv():
+    """Loads users from users.csv into a dictionary keyed by token."""
     try:
-        with open("controls.csv", mode='r', encoding='utf-8') as infile:
+        with open("users.csv", mode="r", encoding="utf-8") as infile:
             reader = csv.DictReader(infile)
             for row in reader:
-                # The Control model will only populate the fields it knows about.
+                user = User(**row)
+                users_by_token[user.token] = user
+        print(f"Loaded {len(users_by_token)} users from users.csv")
+    except FileNotFoundError:
+        print("Error: users.csv not found. No users will be loaded.")
+
+
+def load_controls_from_csv():
+    """Loads and parses control data, including the dynamic sections."""
+    try:
+        with open("controls.csv", mode="r", encoding="utf-8") as infile:
+            reader = csv.DictReader(infile)
+            for row in reader:
+                # Parse the JSON string from the 'sections' column
+                if "sections" in row and row["sections"]:
+                    row["sections"] = json.loads(row["sections"])
+                else:
+                    row["sections"] = (
+                        []
+                    )  # Default to an empty list if column is missing/empty
                 controls.append(Control(**row))
         print(f"Loaded {len(controls)} controls from controls.csv")
     except FileNotFoundError:
@@ -128,6 +132,41 @@ def load_controls_from_csv():
 
 # Load data on startup
 load_controls_from_csv()
+load_users_from_csv()
+
+
+# --- Middleware for Authentication ---
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in [
+            "/login",
+            "/favicon.ico",
+        ] or request.url.path.startswith("/static"):
+            return await call_next(request)
+
+        token_in_cookie = request.cookies.get(COOKIE_NAME)
+        # --- UPDATED: Check against the dictionary of valid user tokens ---
+        if token_in_cookie and token_in_cookie in users_by_token:
+            # --- NEW: If token is valid, attach the username to the request state ---
+            request.state.user = users_by_token[token_in_cookie]
+            return await call_next(request)
+
+        # If token is invalid or missing, show the login dialog
+        return templates.TemplateResponse(
+            "login_dialog.html", {"request": request, "error": None}
+        )
+
+
+class TimingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request.state.start_time = time.time()
+        response = await call_next(request)
+        return response
+
+
+app.add_middleware(AuthMiddleware)
+app.add_middleware(TimingMiddleware)
+
 
 def load_best_practices(control_id: str) -> tuple[str, int]:
     """Loads best practice content and counts the items for a specific control."""
@@ -135,29 +174,51 @@ def load_best_practices(control_id: str) -> tuple[str, int]:
         guidance_path = Path(f"guidance/{control_id}.md")
         content = guidance_path.read_text()
         # Count lines starting with '*' or '-' as a simple heuristic for number of practices
-        practice_count = sum(1 for line in content.splitlines() if line.strip().startswith(('*', '-')))
+        practice_count = sum(
+            1 for line in content.splitlines() if line.strip().startswith(("*", "-"))
+        )
         return content, practice_count
     except FileNotFoundError:
         # If no specific guidance exists, return empty values gracefully
         return "", 0
-    
+
+
 # --- Helper Function to find a control ---
 def find_control_by_id(control_id: str) -> Optional[Control]:
     return next((c for c in controls if c.id == control_id), None)
 
+
+# --- Login Endpoint ---
+@app.post("/login")
+async def login(request: Request, token: str = Form(...)):
+    if token in users_by_token:
+        response = Response(headers={"HX-Refresh": "true"})
+        response.set_cookie(key=COOKIE_NAME, value=token, httponly=True, max_age=86400)
+        return response
+    else:
+        return templates.TemplateResponse(
+            "login_dialog.html",
+            {"request": request, "error": "Invalid token. Please try again."},
+        )
+
+
 # --- Core Endpoints ---
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Serves the main index page with the list of all controls."""
     response_time = time.time() - request.state.start_time
+    user = getattr(request.state, "user", None)
     context = {
-        "request": request, 
+        "request": request,
         "controls": controls,
         "controls_count": len(controls),
-        "response_time": response_time
+        "response_time": response_time,
+        "username": user.username if user else None,
     }
     return templates.TemplateResponse("index.html", context)
+
 
 @app.post("/search", response_class=HTMLResponse)
 async def search_controls(request: Request, query: str = Form(...)):
@@ -167,16 +228,18 @@ async def search_controls(request: Request, query: str = Form(...)):
         filtered_controls = controls
     else:
         filtered_controls = [
-            c for c in controls if
-            search_term in c.name.lower() or
-            search_term in c.risk_id.lower() or
-            search_term in c.owner.lower() or
-            search_term in c.status.lower()
+            c
+            for c in controls
+            if search_term in c.name.lower()
+            or search_term in c.risk_id.lower()
+            or search_term in c.owner.lower()
+            or search_term in c.status.lower()
         ]
     return templates.TemplateResponse(
-        "partials/control_list.html", 
-        {"request": request, "controls": filtered_controls}
+        "partials/control_list.html",
+        {"request": request, "controls": filtered_controls},
     )
+
 
 @app.get("/controls/{control_id}", response_class=HTMLResponse)
 async def get_control(request: Request, control_id: str):
@@ -185,40 +248,45 @@ async def get_control(request: Request, control_id: str):
     structured assessment form.
     """
     control = find_control_by_id(control_id)
+    user = getattr(request.state, "user", None)
     if not control:
         raise HTTPException(status_code=404, detail="Control not found")
-    
+
     _, best_practices_count = load_best_practices(control.id)
 
     response_time = time.time() - request.state.start_time
     context = {
-        "request": request, 
+        "request": request,
         "control": control,
         "controls_count": len(controls),
         "response_time": response_time,
-        "best_practices_count": best_practices_count
+        "best_practices_count": best_practices_count,
+        "username": user.username if user else None,
     }
 
     # This endpoint now renders the simplified control_details.html,
     # which in turn includes the new assessment_workspace.html partial.
     return templates.TemplateResponse("control_details.html", context)
 
+
 @app.post("/ai/rephrase-text")
 async def rephrase_text(
     request: Request,
     text: str = Form(...),
     control_id: str = Form(...),
+    section_title: str = Form(...),
     element_id: str = Form(...),
     element_name: str = Form(...),
-    placeholder: str = Form(...)
+    placeholder: str = Form(...),
 ):
     """Rephrases text with full context awareness."""
     control = find_control_by_id(control_id)
     if not control:
         return HTMLResponse("Error: Control not found.", status_code=404)
-    
-    
-    logging.info(f"Rephrasing text for control '{control_id}' in section '{element_name}'")
+
+    logging.info(
+        f"Rephrasing text for control '{control_id}' in section '{element_name}'"
+    )
     best_practices, best_practices_count = load_best_practices(control_id)
 
     """Takes user text and returns a complete, new textarea element with the rephrased text."""
@@ -237,8 +305,11 @@ async def rephrase_text(
     ---
 
     **CONTEXT OF THE SPECIFIC CONTROL YOU ARE WORKING ON:**
-    - Risk Description: "{control.risk_text}"
-    - Overall Control Description: "{control.control_text}"
+    - Risk Description: "{control.name}"
+    - Overall Control Description: "{control.description}"
+
+    You are rephrasing the text for the following specific section of the assessment:
+    - SECTION TITLE: "{section_title}"
 
     **USER'S TEXT TO REPHRASE:**
     ---
@@ -271,29 +342,36 @@ async def rephrase_text(
         "placeholder": placeholder,
         "controls_count": len(controls),
         "response_time": response_time,
-        "best_practices_count": best_practices_count
+        "best_practices_count": best_practices_count,
     }
 
-    textarea_html = templates.get_template("partials/rephrased_textarea.html").render(context)
+    textarea_html = templates.get_template("partials/rephrased_textarea.html").render(
+        context
+    )
     status_bar_html = templates.get_template("partials/status_bar.html").render(context)
     # Combine the snippets into a single response payload
     full_response = textarea_html + status_bar_html
-    
-    return HTMLResponse(content=full_response)# Return the new textarea element by rendering the partial
+
+    return HTMLResponse(
+        content=full_response
+    )  # Return the new textarea element by rendering the partial
     # return templates.TemplateResponse("partials/rephrased_textarea.html", context)
 
+
 @app.post("/ai/review-text", response_class=HTMLResponse)
-async def review_text(request: Request, text: str = Form(...), control_id: str = Form(...)):
+async def review_text(
+    request: Request, text: str = Form(...), control_id: str = Form(...)
+):
     """Takes user text and returns critical questions from three GRC personas."""
     if not GEMINI_MODEL:
         return HTMLResponse("<p class='text-red-500'>AI model not configured.</p>")
-    
+
     best_practices, best_practices_count = load_best_practices(control_id)
 
     control = find_control_by_id(control_id)
     if not control:
         return HTMLResponse("Error: Control not found.", status_code=404)
-    
+
     # CONTEXT-AWARE PROMPT
     prompt = f"""
     You are a panel of three senior GRC experts reviewing a specific piece of a control assessment.
@@ -305,7 +383,7 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
 
     **CONTEXT OF THE SPECIFIC CONTROL YOU ARE WORKING ON:**
     - Risk Description: "{control.risk_text}"
-    - Overall Control Description: "{control.control_text}"
+    - Overall Control Description: "{control.description}"
 
     **SPECIFIC TEXT SNIPPET TO REVIEW:**
     ---
@@ -323,8 +401,8 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
         response = GEMINI_MODEL.generate_content(prompt)
         # Convert the Markdown list from Gemini into HTML
         questions_html = md.render(response.text)
-        
-       # 1. Calculate the response time
+
+        # 1. Calculate the response time
         response_time = time.time() - request.state.start_time
 
         # 2. Prepare a context dictionary for ALL templates
@@ -333,27 +411,33 @@ async def review_text(request: Request, text: str = Form(...), control_id: str =
             "questions_html": questions_html,
             "controls_count": len(controls),
             "response_time": response_time,
-            "best_practices_count": best_practices_count
+            "best_practices_count": best_practices_count,
         }
 
         # 3. Render both HTML snippets
-        review_card_html = templates.get_template("partials/review_questions.html").render(context)
-        status_bar_html = templates.get_template("partials/status_bar.html").render(context)
+        review_card_html = templates.get_template(
+            "partials/review_questions.html"
+        ).render(context)
+        status_bar_html = templates.get_template("partials/status_bar.html").render(
+            context
+        )
 
         # 4. Combine the snippets into a single response payload
         full_response = review_card_html + status_bar_html
-        
+
         return HTMLResponse(content=full_response)
-    
+
     except Exception as e:
-        return HTMLResponse(content=f"<p class='text-red-500'>Error during AI processing: {e}</p>")
+        return HTMLResponse(
+            content=f"<p class='text-red-500'>Error during AI processing: {e}</p>"
+        )
+
 
 @app.post("/ai/chat", response_class=HTMLResponse)
 async def general_chat(request: Request, user_message: str = Form(...)):
     """Handles general, non-control-specific chat requests."""
     if not GEMINI_MODEL:
         return HTMLResponse("<p class='text-red-500'>AI model not configured.</p>")
-
 
     # Use the central guidance to keep the chat focused on GRC topics
     prompt = f"""
@@ -368,7 +452,7 @@ async def general_chat(request: Request, user_message: str = Form(...)):
     **USER'S QUESTION:**
     {user_message}
     """
-    
+
     try:
         response = GEMINI_MODEL.generate_content(prompt)
         ai_response_html = md.render(response.text)
@@ -382,11 +466,17 @@ async def general_chat(request: Request, user_message: str = Form(...)):
             "controls_count": len(controls),
             "response_time": response_time,
         }
-        
-        chat_pair_html = templates.get_template("partials/chat_message_pair.html").render(context)
-        status_bar_html = templates.get_template("partials/status_bar.html").render(context)
-        
+
+        chat_pair_html = templates.get_template(
+            "partials/chat_message_pair.html"
+        ).render(context)
+        status_bar_html = templates.get_template("partials/status_bar.html").render(
+            context
+        )
+
         return HTMLResponse(content=chat_pair_html + status_bar_html)
 
     except Exception as e:
-        return HTMLResponse(content=f"<p class='text-red-500'>Error during AI processing: {e}</p>")
+        return HTMLResponse(
+            content=f"<p class='text-red-500'>Error during AI processing: {e}</p>"
+        )
