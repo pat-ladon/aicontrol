@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Login</title>
+    <link href="/static/styles.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  </head>
+  <body class="bg-secondary-800">
+    <!-- Full screen overlay with a slightly more opaque background for focus -->
+    <div
+      id="login-modal"
+      class="fixed inset-0 bg-secondary-800 bg-opacity-95 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-secondary-100 p-8 shadow-2xl w-full max-w-[400px] border border-secondary-200"
+      >
+        <h2 class="text-2xl font-semibold text-center text-neutral-900 mb-6">
+          Login with demo password
+        </h2>
+
+        <!-- Login Form -->
+        <form hx-post="/login" hx-target="#login-modal" hx-swap="outerHTML">
+          <div class="mb-4">
+            <label
+              for="passcode"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Passcode</label
+            >
+            <input
+              type="password"
+              name="token"
+              id="token"
+              class="w-full p-2 border border-secondary-200 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              required
+            />
+          </div>
+
+          <!-- Error message with better contrast for the light background -->
+          {% if error %}
+          <div id="error-message" class="text-red-600 text-sm mb-4 font-medium">
+            {{ error }}
+          </div>
+          {% endif %}
+
+          <div class="flex items-center justify-between mt-6">
+            <button
+              type="submit"
+              class="bg-primary-600 text-white font-bold py-2 px-4 w-full hover:bg-opacity-90"
+            >
+              Enter
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

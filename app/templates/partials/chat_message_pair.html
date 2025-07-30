@@ -1,0 +1,15 @@
+<!-- START: templates/partials/chat_message_pair.html -->
+
+<!-- User's Message Bubble -->
+<div class="p-3 my-2 bg-secondary-200 dark:bg-secondary-700 rounded-lg">
+    <p class="font-semibold text-sm text-neutral-900 dark:text-neutral-100">You</p>
+    <div class="prose prose-sm dark:prose-invert max-w-none">{{ user_message }}</div>
+</div>
+
+<!-- AI's Response Bubble -->
+<div class="p-3 my-2 bg-white dark:bg-secondary-850 rounded-lg border border-secondary-200 dark:border-secondary-700">
+    <p class="font-semibold text-sm text-primary-600 dark:text-accent-500">Control assistant</p>
+    <div class="prose prose-sm dark:prose-invert max-w-none">{{ ai_response_html | safe }}</div>
+</div>
+
+<!-- END: templates/partials/chat_message_pair.html -->

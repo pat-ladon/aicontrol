@@ -1,0 +1,191 @@
+<!-- START: templates/index.html (with footer position fixed) -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open GRC</title>
+    <link href="/static/styles.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/theme.js"></script>
+  </head>
+  <body
+    class="bg-secondary-50 dark:bg-secondary-900 font-sans text-neutral-900 dark:text-neutral-100"
+  >
+    <div class="flex flex-col h-screen">
+      <!-- Top Bar -->
+      <header
+        class="bg-primary-500 text-neutral-50 p-4 dark:bg-secondary-900 border-b dark:border-secondary-700"
+      >
+        <div class="px-2 flex justify-between items-center">
+          <h1 class="text-2xl font-bold">Open GRC</h1>
+          <div class="flex items-baseline space-x-4">
+            {% if user %}
+            <span class="text-sm">Welcome, {{ user.username }}</span>
+
+            <!-- NEW: Admin Dropdown Menu -->
+            {% if user.role == 'admin' %}
+            <div class="relative group pb-2">
+              <button class="text-sm p-2 rounded-none hover:bg-white/10">
+                <span>Admin ▾</span>
+              </button>
+              <div
+                class="absolute right-0 mt-2 w-48 bg-white dark:bg-secondary-800 rounded-none shadow-lg py-1 z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300"
+              >
+                <a
+                  href="/admin/users"
+                  class="block px-4 py-2 text-sm text-neutral-900 dark:text-neutral-100 hover:bg-secondary-200 dark:hover:bg-secondary-700"
+                  hx-get="/admin/users"
+                  hx-target="#main-content"
+                  hx-swap="innerHTML"
+                  >Manage Users</a
+                >
+                <a
+                  href="/admin/controls"
+                  class="block px-4 py-2 text-sm text-neutral-900 dark:text-neutral-100 hover:bg-secondary-200 dark:hover:bg-secondary-700"
+                  >Manage Controls</a
+                >
+              </div>
+            </div>
+            {% endif %} {% endif %}
+            <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Grid -->
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar  -->
+        <aside
+          class="w-1/4 bg-secondary-100 dark:bg-secondary-850 p-4 border-r border-secondary-200 dark:border-secondary-700 flex flex-col"
+        >
+          <div class="mb-6">
+            <table class="w-full">
+              <tbody>
+                <tr
+                  class="cursor-pointer group hover:bg-primary-500/10 dark:hover:bg-primary-500/20"
+                  hx-get="/chat"
+                  hx-target="#main-content"
+                  hx-swap="innerHTML"
+                >
+                  <td
+                    class="p-2 text-sm font-semibold text-black dark:text-white group-hover:text-black dark:group-hover:text-white"
+                  >
+                    General Chat
+                  </td>
+                </tr>
+                <!-- Future navigation items can be added as more <tr> elements here -->
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h2 class="text-lg font-semibold mb-4 px-3 py-2">
+              Filter controls
+            </h2>
+            <input
+              type="text"
+              name="query"
+              placeholder="Search controls..."
+              class="w-full p-2 mb-4 border border-secondary-200 dark:border-secondary-700 bg-secondary-100 dark:bg-secondary-800 text-neutral-900 dark:text-neutral-100"
+              hx-post="/search"
+              hx-target="#controls-table-body"
+              hx-trigger="keyup changed delay:500ms, search"
+              hx-indicator=".htmx-indicator"
+            />
+          </div>
+          <div class="mt-6 flex-1 overflow-y-auto">
+            <table class="w-full">
+              <thead>
+                <tr
+                  class="bg-secondary-200 dark:bg-secondary-700 text-neutral-900 dark:text-neutral-100"
+                >
+                  <th class="p-2 text-left">Control</th>
+                </tr>
+              </thead>
+              <tbody id="controls-table-body">
+                {% include 'partials/control_list.html' %}
+              </tbody>
+            </table>
+          </div>
+        </aside>
+
+        <!-- Main Content (Now the Details Pane) -->
+        <main
+          id="main-content"
+          class="w-3/4 bg-white dark:bg-secondary-800 flex flex-col h-full"
+        >
+          <!-- This is the default chat view that appears on load -->
+
+          <!-- Chat History Area (scrollable) -->
+          <div id="chat-history" class="flex-1 p-4 overflow-y-auto">
+            <!-- Welcome Message -->
+            <div
+              class="p-3 my-2 bg-white dark:bg-secondary-850 rounded-lg border border-secondary-200 dark:border-secondary-700"
+            >
+              <p class="font-semibold text-sm text-black dark:text-white">
+                Control assistant
+              </p>
+              <div class="prose prose-sm dark:prose-invert max-w-none">
+                <p>
+                  Welcome! I'm your control assistant. How can I help you today?
+                  You can ask me about best practices, risk mitigation, control
+                  design, or audit preparation.
+                </p>
+                <p>
+                  To work on a specific control, just select it from the list on
+                  the left.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Form Area (fixed at the bottom) -->
+          <div
+            class="p-4 border-t border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-800"
+          >
+            <form
+              id="chat-form"
+              hx-post="/ai/chat"
+              hx-target="#chat-history"
+              hx-swap="beforeend"
+              hx-indicator="#chat-spinner"
+              _="on htmx:afterOnLoad me.reset()"
+            >
+              <div class="flex items-center space-x-3">
+                <textarea
+                  name="user_message"
+                  class="flex-1 p-3 rounded-none border-gray-300 dark:border-gray-600 bg-secondary-50 dark:bg-secondary-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                  rows="1"
+                  placeholder="Ask a question about controls..."
+                ></textarea>
+                <button
+                  type="submit"
+                  class="text-sm font-medium rounded-none px-4 py-2 border transition-colors bg-secondary-200 border-secondary-300 text-black hover:bg-primary-500 hover:border-primary-500 hover:text-white active:bg-primary-600 active:border-primary-600 dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-200 dark:hover:bg-secondary-200 dark:hover:border-secondary-200 dark:hover:text-neutral-900 dark:active:bg-primary-600 dark:active:border-primary-600"
+                >
+                  Send
+                </button>
+              </div>
+              <div id="chat-spinner" class="htmx-indicator text-xs mt-2">
+                Asking control assistant...
+              </div>
+            </form>
+          </div>
+        </main>
+      </div>
+      <!-- <<< Main Grid div closes here -->
+
+      <!-- CHANGE: Footer is now outside the Main Grid div -->
+      <footer
+        class="h-8 bg-secondary-100 dark:bg-secondary-850 border-t border-secondary-200 dark:border-secondary-700 flex items-center"
+      >
+        <!-- NOTE: Removed 'fixed bottom-0 left-0 right-0' as flexbox now handles positioning -->
+        <div id="status-bar" class="w-full">
+          {% include 'partials/status_bar.html' %}
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
+
+<!-- END: templates/index.html -->

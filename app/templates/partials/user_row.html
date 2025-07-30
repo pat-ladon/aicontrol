@@ -1,0 +1,41 @@
+<!-- START: templates/partials/user_row.html (with inlined token button) -->
+<tr>
+  <td class="py-2 px-4 whitespace-nowrap">{{ user_to_display.username }}</td>
+  <td class="py-2 px-4 whitespace-nowrap">
+    <span
+      class="px-2 inline-flex text-xs leading-5 rounded-full text-neutral-900 dark:text-neutral-100 {% if user_to_display.role == 'admin' %} font-semibold bg-secondary-300 dark:bg-secondary-900 {% else %} font-normal bg-secondary-200 dark:bg-secondary-700 {% endif %}"
+    >
+      {{ user_to_display.role }}
+    </span>
+  </td>
+  <td class="py-2 px-4 whitespace-nowrap text-sm">
+    <button
+      type="button"
+      class="text-xs font-medium rounded-none px-3 py-1 border transition-colors bg-transparent border-primary-500 text-black hover:bg-primary-500 hover:text-white dark:bg-secondary-800 dark:border-primary-500 dark:text-white dark:hover:bg-primary-500"
+      hx-get="/admin/users/token/{{ user_to_display.token }}"
+      hx-target="this"
+      hx-swap="outerHTML"
+    >
+      Show Token
+    </button>
+  </td>
+  <td
+    class="py-2 px-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400"
+  >
+    {{ user_to_display.created_on.split('T')[0] }}
+  </td>
+  <td class="py-2 px-4 whitespace-nowrap text-sm">
+    <button
+      type="button"
+      class="text-xs font-medium rounded-none px-3 py-1 border transition-colors bg-transparent border-primary-500 text-black hover:bg-primary-500 hover:text-white dark:bg-secondary-800 dark:border-primary-500 dark:text-white dark:hover:bg-primary-500"
+      hx-delete="/admin/users/delete/{{ user_to_display.token }}"
+      hx-target="closest tr"
+      hx-swap="outerHTML swap:500ms"
+      hx-confirm="Are you sure you want to delete the user '{{ user_to_display.username }}'? This action cannot be undone."
+    >
+      Delete
+    </button>
+  </td>
+</tr>
+
+<!-- END: templates/partials/user_row.html -->

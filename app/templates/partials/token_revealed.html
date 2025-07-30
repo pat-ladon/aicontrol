@@ -1,0 +1,16 @@
+<!-- START: templates/partials/token_revealed.html -->
+<div class="flex items-center space-x-2">
+  <span class="text-sm font-mono bg-secondary-200 dark:bg-secondary-700 p-1">
+    {{ token }}
+  </span>
+  <button
+    type="button"
+    class="text-xs text-gray-500 hover:underline"
+    hx-get="/admin/users/token/hide/{{ token }}"
+    hx-target="closest div"
+    hx-swap="outerHTML"
+  >
+    (hide)
+  </button>
+</div>
+<!-- END: templates/partials/token_revealed.html -->
