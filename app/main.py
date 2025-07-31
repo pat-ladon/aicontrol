@@ -56,6 +56,7 @@ log = structlog.get_logger()
 # --- FastAPI App Setup ---
 load_dotenv()
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+APP_VERSION = "0.1"
 SECRET_KEY = os.getenv("SECRET_KEY")
 COOKIE_NAME = "auth_token_session"
 
@@ -304,6 +305,7 @@ async def read_root(request: Request):
         "controls_count": len(controls),
         "response_time": response_time,
         "user": user,
+        "app_version": APP_VERSION,
     }
     return templates.TemplateResponse("index.html", context)
 

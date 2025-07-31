@@ -1,33 +1,48 @@
-<!-- START: templates/partials/status_bar.html -->
+<!-- START: app/templates/partials/status_bar.html (with central disclaimer) -->
 
-<!-- 
-  hx-swap-oob="true" tells HTMX to find the element with id="status-bar" 
-  on the page and swap its content, even though this snippet is part
-  of a larger response.
--->
 <div
   id="status-bar"
-  hx-swap-oob="true"
+  hx-swap-o-ob="true"
   class="w-full flex justify-between items-center text-xs px-4"
 >
-  <div class="text-gray-500 dark:text-gray-400">
+  <!-- Left Section -->
+  <div
+    class="flex-1 text-left text-gray-500 dark:text-gray-400 flex items-center space-x-2"
+  >
     <span>{{ controls_count }} controls loaded.</span>
+
     {% if best_practices_count and best_practices_count > 0 %}
     <span class="text-gray-300 dark:text-gray-600">|</span>
     <span>{{ best_practices_count }} best practices considered.</span>
     {% endif %}
   </div>
-  <div class="text-right text-gray-500 dark:text-gray-400">
+
+  <!-- Center Section (The Disclaimer) -->
+  <div
+    class="flex-grow text-center text-gray-500 dark:text-gray-400 font-semibold"
+  >
+    <span>AI may make mistakes. Please verify all outputs.</span>
+  </div>
+
+  <!-- Right Section -->
+  <div
+    class="flex-1 text-right text-gray-500 dark:text-gray-400 flex items-center justify-end space-x-4"
+  >
+    <!-- Response Time -->
     {% if response_time and response_time > 0 %}
-    <!-- CHANGE: Added if/else block for human-readable time -->
     <span
       >Server Response: {% if response_time >= 1 %} {{
       "%.2f"|format(response_time) }} s {% else %} {{
       "%.2f"|format(response_time * 1000) }} ms {% endif %}
     </span>
-    <span class="italic ml-2">(high latency channel)</span>
+    {% endif %}
+
+    <!-- Version Number -->
+    {% if app_version %}
+    <span class="text-gray-300 dark:text-gray-600">|</span>
+    <span class="font-mono">v{{ app_version }}</span>
     {% endif %}
   </div>
 </div>
 
-<!-- END: templates/partials/status_bar.html -->
+<!-- END: app/templates/partials/status_bar.html -->
