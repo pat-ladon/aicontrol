@@ -1,5 +1,5 @@
 # GRC AI Co-pilot
-[![Release](https://img.shields.io/badge/Release-v0.1-blue.svg)]
+![Release](https://img.shields.io/badge/Release-v0.1-blue.svg)
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Framework](https://img.shields.io/badge/FastAPI-0.110.0-green.svg)](https://fastapi.tiangolo.com/)
 [![Frontend](https://img.shields.io/badge/HTMX-1.9.10-blue)](https://htmx.org/)
