@@ -13,9 +13,12 @@ from datetime import datetime
 import uuid
 import copy
 
+import structlog
+
 import vertexai
 from vertexai.generative_models import GenerativeModel
 from markdown_it import MarkdownIt
+from google.cloud import bigquery
 
 from fastapi import FastAPI, Request, Form, HTTPException, Response
 from fastapi.templating import Jinja2Templates
@@ -26,21 +29,28 @@ from pydantic import BaseModel
 
 # --- logging configuration ---
 # Create a custom formatter
-log_formatter = logging.Formatter(
-    "%(asctime)s | %(funcName)s | %(message)s", datefmt="%Y-%m-%d %H:%M"
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.StackInfoRenderer(),
+        structlog.dev.set_exc_info,
+        structlog.processors.TimeStamper(fmt="iso"),
+        # For local development, use a console renderer.
+        # For production (e.g., Cloud Run), use the JSON renderer.
+        (
+            structlog.dev.ConsoleRenderer()
+            if "PY_ENV" in os.environ and os.environ["PY_ENV"] == "development"
+            else structlog.processors.JSONRenderer()
+        ),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+    cache_logger_on_first_use=False,
 )
-
-# Get the root logger
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-
-# Remove any existing handlers to avoid duplicates
-root_logger.handlers.clear()
-
-# Create a new handler to print to console and apply the formatter
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(log_formatter)
-root_logger.addHandler(console_handler)
+# Get a logger instance
+log = structlog.get_logger()
 # --- logging configuration ---
 
 # --- FastAPI App Setup ---
@@ -64,6 +74,16 @@ except Exception as e:
     print(f"Error initializing Vertex AI: {e}. AI features will be disabled.")
     GEMINI_MODEL = None
 
+
+# --- BigQuery Client Initialization ---
+try:
+    BQ_CLIENT = bigquery.Client()
+    USER_TABLE_ID = "aicontrol-8c59b.feedback.users"
+    print("BigQuery client initialized successfully.")
+except Exception as e:
+    print(f"Error initializing BigQuery client: {e}. User management will be disabled.")
+    BQ_CLIENT = None
+
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -74,6 +94,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # --- Data Model & Loading ---
 class User(BaseModel):
     username: str
+    email: str
     token: str
     role: str
     created_on: str
@@ -105,17 +126,24 @@ controls: List[Control] = []
 users_by_token: Dict[str, User] = {}
 
 
-def load_users_from_csv():
-    """Loads users from users.csv into a dictionary keyed by token."""
+def load_users_from_bq():
+    """Loads users from BigQuery into a dictionary keyed by token on startup."""
+    if not BQ_CLIENT:
+        print("BigQuery client not available. Skipping user load.")
+        return
+
+    query = f"SELECT username, email, token, role, created_on FROM `{USER_TABLE_ID}`"
     try:
-        with open("users.csv", mode="r", encoding="utf-8") as infile:
-            reader = csv.DictReader(infile)
-            for row in reader:
-                user = User(**row)
-                users_by_token[user.token] = user
-        print(f"Loaded {len(users_by_token)} users from users.csv")
-    except FileNotFoundError:
-        print("Error: users.csv not found. No users will be loaded.")
+        query_job = BQ_CLIENT.query(query)
+        for row in query_job:
+            # Convert created_on from datetime to ISO string to match Pydantic model
+            user_data = dict(row)
+            user_data["created_on"] = user_data["created_on"].isoformat() + "Z"
+            user = User(**user_data)
+            users_by_token[user.token] = user
+        print(f"Loaded {len(users_by_token)} users from BigQuery table {USER_TABLE_ID}")
+    except Exception as e:
+        print(f"Error loading users from BigQuery: {e}")
 
 
 def load_controls_from_csv():
@@ -139,7 +167,7 @@ def load_controls_from_csv():
 
 # Load data on startup
 load_controls_from_csv()
-load_users_from_csv()
+load_users_from_bq()
 
 
 # --- Middleware for Authentication ---
@@ -203,6 +231,63 @@ async def login(request: Request, token: str = Form(...)):
             "login_dialog.html",
             {"request": request, "error": "Invalid token. Please try again."},
         )
+
+
+# --- Central AI Calling and Logging Function (updated for structlog) ---
+async def call_ai_and_log(
+    request: Request,
+    prompt: str,
+    prompt_template_id: str,
+    user_input_text: str,  # <-- CHANGE 1: Add new parameter
+    control_id: Optional[str] = None,
+    section_name: Optional[str] = None,
+):
+    """
+    A central function to call the Gemini API and log structured events using structlog.
+    """
+    interaction_id = str(uuid.uuid4())
+    user = getattr(request.state, "user", None)
+
+    log.info(
+        "ai_request_sent",
+        interaction_id=interaction_id,
+        endpoint_name=request.scope["endpoint"].__name__,
+        username=user.username if user else "anonymous",
+        control_id=control_id,
+        section_name=section_name,
+        prompt_template_id=prompt_template_id,
+        ai_model_name=MODEL_NAME,
+        # --- CHANGE 2: Add user's text to the request payload ---
+        request_payload={
+            "prompt_length": len(prompt),
+            "user_input_text": user_input_text,
+        },
+    )
+
+    # ... (The rest of the function remains exactly the same) ...
+    start_time = time.time()
+    try:
+        response = GEMINI_MODEL.generate_content(prompt)
+        ai_response_text = response.text.strip()
+        latency_ms = (time.time() - start_time) * 1000
+        log.info(
+            "ai_response_received",
+            interaction_id=interaction_id,
+            username=user.username if user else "anonymous",
+            response_latency_ms=round(latency_ms, 2),
+            response_payload={"response_text": ai_response_text},
+        )
+        return ai_response_text
+    except Exception as e:
+        latency_ms = (time.time() - start_time) * 1000
+        log.error(
+            "ai_call_failed",
+            interaction_id=interaction_id,
+            username=user.username if user else "anonymous",
+            response_latency_ms=round(latency_ms, 2),
+            error_message=str(e),
+        )
+        return f"Error: Could not process request. Details: {e}"
 
 
 # --- Core Endpoints ---
@@ -296,9 +381,6 @@ async def rephrase_text(
     if not control:
         return HTMLResponse("Error: Control not found.", status_code=404)
 
-    logging.info(
-        f"Rephrasing text for control '{control_id}' in section '{element_name}'"
-    )
     best_practices, best_practices_count = load_best_practices(control_id)
 
     """Takes user text and returns a complete, new textarea element with the rephrased text."""
@@ -338,12 +420,19 @@ async def rephrase_text(
     4.  Your entire response must be the improved text and nothing else.
     """
 
-        try:
-            response = GEMINI_MODEL.generate_content(prompt)
-            rephrased_text = response.text.strip()
-        except Exception as e:
-            rephrased_text = f"Error: Could not rephrase text. Details: {e}"
-
+        # try:
+        #     response = GEMINI_MODEL.generate_content(prompt)
+        #     rephrased_text = response.text.strip()
+        # except Exception as e:
+        #     rephrased_text = f"Error: Could not rephrase text. Details: {e}"
+        rephrased_text = await call_ai_and_log(
+            request,
+            prompt,
+            prompt_template_id="rephrase_v0.1",
+            user_input_text=text,  # <-- Added this
+            control_id=control_id,
+            section_name=section_title,
+        )
     response_time = time.time() - request.state.start_time
 
     context = {
@@ -372,7 +461,10 @@ async def rephrase_text(
 
 @app.post("/ai/review-text", response_class=HTMLResponse)
 async def review_text(
-    request: Request, text: str = Form(...), control_id: str = Form(...)
+    request: Request,
+    text: str = Form(...),
+    control_id: str = Form(...),
+    section_title: str = Form(...),
 ):
     """Takes user text and returns critical questions from three GRC personas."""
     if not GEMINI_MODEL:
@@ -410,9 +502,16 @@ async def review_text(
     - **As an Audit Manager:** [Your question, focusing on testability, evidence, and repeatability]
     """
     try:
-        response = GEMINI_MODEL.generate_content(prompt)
+        ai_response_text = await call_ai_and_log(
+            request,
+            prompt,
+            prompt_template_id="review_v0.1",
+            user_input_text=text,
+            control_id=control_id,
+            section_name=section_title,
+        )
         # Convert the Markdown list from Gemini into HTML
-        questions_html = md.render(response.text)
+        questions_html = md.render(ai_response_text)
 
         # 1. Calculate the response time
         response_time = time.time() - request.state.start_time
@@ -499,62 +598,95 @@ async def general_chat(request: Request, user_message: str = Form(...)):
 
 @app.get("/admin/users", response_class=HTMLResponse)
 async def manage_users_page(request: Request):
-    """Serves the user management page as a workspace fragment with status bar update."""
+    """
+    Serves the user management page by fetching the LATEST user list
+    directly from BigQuery.
+    """
     user = getattr(request.state, "user", None)
     if not user or user.role != "admin":
         raise HTTPException(status_code=403, detail="Access Forbidden")
 
-    all_users = list(users_by_token.values())
-    response_time = time.time() - request.state.start_time
+    # --- CHANGE: Query BigQuery directly instead of using the in-memory list ---
+    all_users = []
+    if not BQ_CLIENT:
+        logging.error("BigQuery client not available for manage_users_page.")
+    else:
+        query = f"SELECT username, email, token, role, created_on FROM `{USER_TABLE_ID}` ORDER BY created_on"
+        try:
+            query_job = BQ_CLIENT.query(query)
+            for row in query_job:
+                user_data = dict(row)
+                user_data["created_on"] = user_data["created_on"].isoformat() + "Z"
+                all_users.append(User(**user_data))
+        except Exception as e:
+            logging.error(f"Failed to fetch users from BigQuery for admin page: {e}")
+            # We can continue with an empty list to avoid crashing the page
 
+    response_time = time.time() - request.state.start_time
     context = {
         "request": request,
         "user": user,
-        "all_users": all_users,
+        "all_users": all_users,  # This list is now always up-to-date
         "controls_count": len(controls),
         "response_time": response_time,
-        # We don't have a specific control, so no 'best_practices_count'
     }
 
-    # Render both the main content and the status bar for a full workspace update
     users_page_html = templates.get_template("admin/users.html").render(context)
     status_bar_html = templates.get_template("partials/status_bar.html").render(context)
 
     return HTMLResponse(content=users_page_html + status_bar_html)
 
 
-# In app/main.py
-
-
 @app.post("/admin/users/add", response_class=HTMLResponse)
 async def add_user(request: Request, username: str = Form(...), role: str = Form(...)):
-    """Handles the creation of a new user."""
+    """Handles the creation of a new user in BigQuery."""
     user = getattr(request.state, "user", None)
     if not user or user.role != "admin":
         raise HTTPException(status_code=403, detail="Access Forbidden")
 
     new_token = secrets.token_hex(16)
-    created_on = datetime.utcnow().isoformat() + "Z"
+    created_on = datetime.utcnow()  # BQ TIMESTAMP type prefers datetime objects
+
+    # Pydantic model for in-memory use
     new_user = User(
-        username=username, token=new_token, role=role, created_on=created_on
+        username=username,
+        token=new_token,
+        role=role,
+        created_on=created_on.isoformat() + "Z",
     )
 
-    script_dir = Path(__file__).parent  # This gets the project root directory
-    csv_path = script_dir / "users.csv"
+    # --- NEW: BigQuery Insert Logic ---
+    if not BQ_CLIENT:
+        raise HTTPException(status_code=500, detail="Database client not configured.")
+
+    rows_to_insert = [
+        {
+            "username": username,
+            "token": new_token,
+            "role": role,
+            "created_on": created_on,
+        }
+    ]
 
     try:
-        # Use the explicit path variable here
-        with open(csv_path, mode="a", newline="", encoding="utf-8") as outfile:
-            writer = csv.writer(outfile)
-            writer.writerow(
-                [new_user.username, new_user.token, new_user.role, new_user.created_on]
+        errors = BQ_CLIENT.insert_rows_json(USER_TABLE_ID, rows_to_insert)
+        if errors:
+            logging.error(f"BigQuery insert errors: {errors}")
+            raise HTTPException(
+                status_code=500, detail="Could not save new user to database."
             )
     except Exception as e:
-        logging.error(f"Failed to write new user to {csv_path}: {e}")
+        log.error("user_add_failed_bq", error=str(e))
         raise HTTPException(status_code=500, detail="Could not save new user.")
 
+    # Add to the in-memory dictionary for the current session
     users_by_token[new_user.token] = new_user
-    logging.info(f"Admin '{user.username}' created new user '{new_user.username}'")
+    log.info(
+        "user_created",
+        admin_user=user.username,
+        new_user=new_user.username,
+        new_user_role=new_user.role,
+    )
 
     return templates.TemplateResponse(
         "partials/user_row.html", {"request": request, "user_to_display": new_user}
@@ -585,47 +717,44 @@ async def hide_full_token(request: Request, token_value: str):
 
 @app.delete("/admin/users/delete/{token}", status_code=200)
 async def delete_user(request: Request, token: str):
-    """Handles the deletion of a user."""
+    """Handles the deletion of a user from BigQuery."""
     user = getattr(request.state, "user", None)
-    # --- SECURITY: Ensure only admins can perform this action ---
     if not user or user.role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Find the user to be deleted for logging purposes
     user_to_delete = users_by_token.get(token)
     if not user_to_delete:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found in memory")
 
-    # --- 1. Remove from in-memory dictionary ---
-    del users_by_token[token]
-    logging.info(
-        f"Admin '{user.username}' deleted user '{user_to_delete.username}' (token: {token})"
+    # --- NEW: BigQuery Delete Logic ---
+    if not BQ_CLIENT:
+        raise HTTPException(status_code=500, detail="Database client not configured.")
+
+    query = f"DELETE FROM `{USER_TABLE_ID}` WHERE token = @token"
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("token", "STRING", token),
+        ]
     )
 
-    # --- 2. Rewrite the CSV file without the deleted user ---
-    # This is the safest way to remove a row from a CSV
-    script_dir = Path(__file__).parent
-    csv_path = script_dir / "users.csv"
-
-    # Read all current users into a list
-    current_users = []
-    with open(csv_path, mode="r", newline="", encoding="utf-8") as infile:
-        reader = csv.DictReader(infile)
-        for row in reader:
-            # Add every user EXCEPT the one we are deleting
-            if row["token"] != token:
-                current_users.append(row)
-
-    # Write the filtered list back to the file, overwriting it
-    with open(csv_path, mode="w", newline="", encoding="utf-8") as outfile:
-        # Use the same fieldnames as the original file
-        writer = csv.DictWriter(
-            outfile, fieldnames=["username", "token", "role", "created_on"]
+    try:
+        BQ_CLIENT.query(
+            query, job_config=job_config
+        ).result()  # .result() waits for job to complete
+    except Exception as e:
+        log.error("user_delete_failed_bq", error=str(e))
+        raise HTTPException(
+            status_code=500, detail="Could not delete user from database."
         )
-        writer.writeheader()
-        writer.writerows(current_users)
 
-    # 3. Return an empty 200 OK response. HTMX will use this to remove the row.
+    # Remove from in-memory dictionary
+    del users_by_token[token]
+    log.info(
+        "user_deleted",
+        admin_user=user.username,
+        deleted_user=user_to_delete.username,
+    )
+
     return Response(status_code=200)
 
 

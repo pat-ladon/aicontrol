@@ -103,3 +103,17 @@ The co-pilot's core value comes from its context-aware AI tools, which are avail
       --allow-unauthenticated \
       --set-env-vars="SECRET_KEY=YOUR_SECRET_KEY"
     ```
+
+### Load BQ dataset tables
+
+1.  Starter dataset for user management.
+
+```bash
+bq load \
+  --source_format=CSV \
+  --skip_leading_rows=1 \
+  --autodetect \
+  feedback.users \
+  ./users.csv \
+  username:STRING,email:STRING,token:STRING,role:STRING,created_on:TIMESTAMP
+``` 

@@ -1,7 +1,7 @@
 // tailwind.config.js
 
 module.exports = {
-  content: ["./templates/**/*.html", "./templates/partials/**/*.html"],
+  content: ["./app/templates/**/*.html", "./app/templates/partials/**/*.html"],
   darkMode: "class",
 
   theme: {

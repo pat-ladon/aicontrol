@@ -1,5 +1,5 @@
-username,token,role,created_on
-Alice,token-alice-123-abc,admin,2024-08-01T10:00:00Z
-Bob,token-bob-456-def,user,2024-08-01T10:01:00Z
-Patrick,token-charlie-789-ghi,admin,2024-08-01T10:02:00Z
-Kate,4fb9608cbace6329412fe12cbea608f3,user,2025-07-30T21:20:06.513583Z
+username,email,token,role,created_on
+Alice,alice@example.com,a8f5b1e9c2d3a4b5c6d7e8f9a0b1c2d3,admin,2024-08-01T10:00:00Z
+Bob,bob@example.com,b7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2,user,2024-08-01T10:01:00Z
+Patrick,patrick@example.com,c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1,admin,2024-08-01T10:02:00Z
+Kate,kate@example.com,d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1b0,user,2025-07-30T21:20:06Z
