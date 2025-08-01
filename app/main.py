@@ -65,7 +65,8 @@ md = MarkdownIt()
 # Configure Gemini API
 PROJECT_ID = "aicontrol-8c59b"  # Replace with your project ID
 LOCATION = "us-central1"
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.0-flash-lite-001"
+# MODEL_NAME = "gemini-2.5-flash"
 
 try:
     vertexai.init(project=PROJECT_ID, location=LOCATION)
