@@ -178,12 +178,17 @@ metadata:
 spec:
   # Run every 5 minutes
   schedule: "*/5 * * * *"
+  # Prevents jobs from running concurrently if one takes longer than 5 minutes
+  concurrencyPolicy: Forbid
+  # Keeps the last successful and failed jobs for debugging
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
       template:
         spec:
           # IMPORTANT: You may need to specify a serviceAccountName that has permissions
-          # to read logs and write to BigQuery.
+          # to read logs (roles/logging.viewer) and write to BigQuery (roles/bigquery.dataEditor).
           # serviceAccountName: your-gke-service-account
           containers:
           - name: log-etl-container
@@ -195,12 +200,58 @@ spec:
               value: "feedback"
             - name: BQ_TABLE
               value: "ai_interactions"
+            # --- CHANGE: Added resource requests and limits ---
+            resources:
+              requests:
+                # Guaranteed minimum resources for the pod
+                cpu: "100m"      # 1/10th of a CPU core
+                memory: "256Mi"  # 256 Mebibytes of RAM
+              limits:
+                # Maximum resources the pod is allowed to use
+                cpu: "500m"      # 1/2 of a CPU core
+                memory: "512Mi"  # 512 Mebibytes of RAM
           restartPolicy: OnFailure
 ```
 
 **Deploy the CronJob to your GKE cluster:**
 ```bash
 kubectl apply -f cronjob.yaml
+```
+
+### Step 4: Create the bootstrap table in bq
+
+```bash
+bq mk --table \
+  --description "Stores structured logs for GRC Co-pilot AI interactions" \
+  aicontrol-8c59b:feedback.ai_interactions \
+  ./bq_schema.json
+```
+
+For changes use:
+
+```bash
+bq update feedback.ai_interactions ./bq_schema.json
+```
+
+The  bq_schema.json file content is
+
+```json
+[
+  {"name": "event_timestamp", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "event_type", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "interaction_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "endpoint_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "username", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "control_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "section_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "prompt_template_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "ai_model_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "request_payload", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "response_payload", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "response_latency_ms", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "error_message", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "user_feedback_score", "type": "INTEGER", "mode": "NULLABLE"}
+]
 ```
 
 ### What This Achieves

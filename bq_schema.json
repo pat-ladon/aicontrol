@@ -1,0 +1,15 @@
+[
+  {"name": "event_timestamp", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "event_type", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "interaction_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "endpoint_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "username", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "control_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "section_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "prompt_template_id", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "ai_model_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "request_payload", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "response_payload", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "response_latency_ms", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "error_message", "type": "STRING", "mode": "NULLABLE"}
+]
