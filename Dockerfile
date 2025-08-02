@@ -28,4 +28,4 @@ EXPOSE 8080
 
 # 7. Define the command to run your application using a production server (Gunicorn)
 # This command now works because main.py is correctly located at /app/main.py
-CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8080"]
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8080"]

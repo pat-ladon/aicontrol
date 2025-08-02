@@ -15,10 +15,12 @@ import copy
 
 import structlog
 
+import google.cloud.logging 
 import vertexai
 from vertexai.generative_models import GenerativeModel
 from markdown_it import MarkdownIt
 from google.cloud import bigquery
+from google.cloud.logging.handlers import CloudLoggingHandler
 
 from fastapi import FastAPI, Request, Form, HTTPException, Response
 from fastapi.templating import Jinja2Templates
@@ -28,29 +30,51 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # --- logging configuration ---
-# Create a custom formatter
+LOG_ENV = os.getenv("PY_ENV", "prod").lower()
+
+# 2. Define shared processors that PREPARE the log, but do not render it
+shared_processors = [
+    structlog.contextvars.merge_contextvars,
+    structlog.stdlib.add_logger_name,
+    structlog.stdlib.add_log_level,
+    structlog.processors.TimeStamper(fmt="iso", utc=True),
+    structlog.dev.set_exc_info,
+    # This processor must be the last one to prepare the log record for the formatter
+    structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+]
+
+# 3. Configure structlog to integrate with standard logging
 structlog.configure(
-    processors=[
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.StackInfoRenderer(),
-        structlog.dev.set_exc_info,
-        structlog.processors.TimeStamper(fmt="iso"),
-        # For local development, use a console renderer.
-        # For production (e.g., Cloud Run), use the JSON renderer.
-        (
-            structlog.dev.ConsoleRenderer()
-            if "PY_ENV" in os.environ and os.environ["PY_ENV"] == "development"
-            else structlog.processors.JSONRenderer()
-        ),
-    ],
-    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-    context_class=dict,
-    logger_factory=structlog.PrintLoggerFactory(),
-    cache_logger_on_first_use=False,
+    processors=shared_processors,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
 )
-# Get a logger instance
+
+# 4. Define the final formatter AND handler based on the environment
+if LOG_ENV == "development":
+    # In development, the final renderer is the colorful ConsoleRenderer
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processor=structlog.dev.ConsoleRenderer(colors=True),
+    )
+    handler = logging.StreamHandler()
+else:
+    # In production, the final renderer is the JSONRenderer
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processor=structlog.processors.JSONRenderer(),
+    )
+    # And the handler is the Google Cloud Logging handler
+    handler = CloudLoggingHandler(google.cloud.logging.Client())
+
+# 5. Configure Python's root logger to use our new handler and formatter
+handler.setFormatter(formatter)
+root_logger = logging.getLogger()
+root_logger.handlers.clear() # Clear any existing handlers
+root_logger.addHandler(handler)
+root_logger.setLevel(logging.INFO)
+
+# 6. Get a logger instance for the application to use
 log = structlog.get_logger()
+
 # --- logging configuration ---
 
 # --- FastAPI App Setup ---
@@ -309,6 +333,25 @@ async def read_root(request: Request):
     }
     return templates.TemplateResponse("index.html", context)
 
+@app.get("/api/metrics")
+async def get_metrics():
+    """
+    Reads the metrics.json file from the mounted GCS volume and returns it.
+    """
+    # The mount path for the bucket inside the Cloud Run container
+    metrics_path = Path("/mnt/gcs/metrics.json")
+    
+    if not metrics_path.exists():
+        return {"error": "Metrics file not found. The job may not have run yet."}
+    
+    try:
+        with open(metrics_path, 'r') as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        log.error("metrics_read_failed", error=str(e))
+        return {"error": f"Failed to read or parse metrics file: {e}"}
+
 
 @app.get("/chat", response_class=HTMLResponse)
 async def get_chat_workspace(request: Request):
@@ -361,6 +404,7 @@ async def get_control(request: Request, control_id: str):
         "response_time": response_time,
         "best_practices_count": best_practices_count,
         "username": user.username if user else None,
+        "app_version": APP_VERSION,
     }
 
     # This endpoint now renders the simplified control_details.html,
@@ -640,7 +684,7 @@ async def manage_users_page(request: Request):
 
 
 @app.post("/admin/users/add", response_class=HTMLResponse)
-async def add_user(request: Request, username: str = Form(...), role: str = Form(...)):
+async def add_user(request: Request, username: str = Form(...), role: str = Form(...), email: str = Form(...)):
     """Handles the creation of a new user in BigQuery."""
     user = getattr(request.state, "user", None)
     if not user or user.role != "admin":
@@ -651,6 +695,7 @@ async def add_user(request: Request, username: str = Form(...), role: str = Form
 
     # Pydantic model for in-memory use
     new_user = User(
+        email=email,
         username=username,
         token=new_token,
         role=role,
@@ -663,10 +708,11 @@ async def add_user(request: Request, username: str = Form(...), role: str = Form
 
     rows_to_insert = [
         {
+            "email": email,
             "username": username,
             "token": new_token,
             "role": role,
-            "created_on": created_on,
+            "created_on": created_on.isoformat(),
         }
     ]
 
@@ -701,6 +747,18 @@ async def show_full_token(request: Request, token_value: str):
     user = getattr(request.state, "user", None)
     if not user or user.role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden")
+    
+    user_whose_token_is_viewed = users_by_token.get(token_value)
+    
+    log.info(
+        "token_viewed",
+        admin_user=user.username,
+        viewed_user_token_for=(
+            user_whose_token_is_viewed.username
+            if user_whose_token_is_viewed
+            else "unknown_user"
+        ),
+    )
     return templates.TemplateResponse(
         "partials/token_revealed.html", {"request": request, "token": token_value}
     )

@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Open GRC</title>
     <link href="/static/styles.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/static/favicon.png" />
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/theme.js"></script>
   </head>
   <body
@@ -20,7 +21,10 @@
         class="bg-primary-500 text-neutral-50 p-4 dark:bg-secondary-900 border-b dark:border-secondary-700"
       >
         <div class="px-2 flex justify-between items-center">
-          <h1 class="text-2xl font-bold">Open GRC</h1>
+          <div class="flex items-center space-x-3">
+            {% include 'partials/logo.html' %}
+            <h1 class="text-2xl font-bold">Open GRC</h1>
+          </div>
           <div class="flex items-baseline space-x-4">
             {% if user %}
             <span class="text-sm">Welcome, {{ user.username }}</span>
@@ -117,10 +121,53 @@
         <!-- Main Content (Now the Details Pane) -->
         <main
           id="main-content"
-          class="w-3/4 bg-white dark:bg-secondary-800 flex flex-col h-full"
+          class="w-3/4 bg-white dark:bg-secondary-800 flex flex-col"
         >
           <!-- This is the default chat view that appears on load -->
-
+          <!-- Dashboard View (will be removed by OOB swap) -->
+          <div
+            id="dashboard-view"
+            class="flex-shrink-0 p-4 border-b border-secondary-200 dark:border-secondary-700"
+          >
+            <h2
+              class="text-xl font-bold mb-4 text-neutral-900 dark:text-neutral-100"
+            >
+              Analytics Dashboard
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- KPI Card -->
+              <div
+                class="p-4 bg-secondary-100 dark:bg-secondary-850 rounded-none"
+              >
+                <h3 class="text-sm font-medium text-gray-500">
+                  Total Interactions
+                </h3>
+                <p
+                  id="total-interactions-kpi"
+                  class="text-3xl font-bold text-primary-600 dark:text-accent-500"
+                >
+                  Loading...
+                </p>
+              </div>
+              <!-- Trend Chart -->
+              <div
+                class="md:col-span-2 p-4 bg-secondary-100 dark:bg-secondary-850 rounded-none"
+              >
+                <h3 class="text-lg font-semibold mb-2">
+                  User Activity (Last 30 Days)
+                </h3>
+                <canvas id="trendChart"></canvas>
+              </div>
+            </div>
+            <div
+              class="mt-4 p-4 bg-secondary-100 dark:bg-secondary-850 rounded-none"
+            >
+              <h3 class="text-lg font-semibold mb-2">
+                Interactions per Endpoint
+              </h3>
+              <canvas id="endpointChart"></canvas>
+            </div>
+          </div>
           <!-- Chat History Area (scrollable) -->
           <div id="chat-history" class="flex-1 p-4 overflow-y-auto">
             <!-- Welcome Message -->
@@ -190,6 +237,84 @@
       </footer>
     </div>
   </body>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // THIS IS THE NEW, SECURE API ENDPOINT
+      const METRICS_URL = `/api/metrics`;
+
+      fetch(METRICS_URL)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+          return response.json();
+        })
+        .then((data) => {
+          if (data.error) {
+            console.error("Error fetching analytics data:", data.error);
+            document.getElementById("total-interactions-kpi").textContent =
+              "Error";
+            return;
+          }
+
+          // KPI Card
+          document.getElementById("total-interactions-kpi").textContent =
+            data.total_interactions;
+
+          // Trend Chart
+          const trendCtx = document
+            .getElementById("trendChart")
+            .getContext("2d");
+          new Chart(trendCtx, {
+            type: "line",
+            data: {
+              labels: data.trend_data.labels,
+              datasets: [
+                {
+                  label: "Active Users",
+                  data: data.trend_data.active_users,
+                  borderColor: "#28A7A7", // Teal
+                  tension: 0.1,
+                },
+                {
+                  label: "Interactions",
+                  data: data.trend_data.interactions,
+                  borderColor: "#0A2540", // Navy
+                  tension: 0.1,
+                },
+              ],
+            },
+          });
+
+          // Endpoint Chart
+          const endpointCtx = document
+            .getElementById("endpointChart")
+            .getContext("2d");
+          new Chart(endpointCtx, {
+            type: "bar",
+            data: {
+              labels: data.endpoint_data.labels,
+              datasets: [
+                {
+                  label: "# of Interactions",
+                  data: data.endpoint_data.interactions,
+                  backgroundColor: "#3A5983", // Dark Blue/Gray
+                },
+              ],
+            },
+            options: {
+              indexAxis: "y",
+            },
+          });
+        })
+        .catch((error) => {
+          console.error("Error fetching or rendering analytics data:", error);
+          document.getElementById("total-interactions-kpi").textContent =
+            "Error";
+        });
+    });
+  </script>
 </html>
 
 <!-- END: templates/index.html -->
